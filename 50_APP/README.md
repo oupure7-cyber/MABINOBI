@@ -9,7 +9,10 @@ pip install -r 50_APP/requirements.txt
 python 50_APP/main.py
 ```
 
-또는 프로젝트 루트의 [마비노비.exe](../마비노비.exe)를 더블클릭 (`launcher/launch_mabinobi.py`를 PyInstaller로 빌드한 얇은 런처 — 시스템 Python을 찾아 위 명령을 대신 실행해줄 뿐, 앱 자체를 번들링한 건 아니라서 Python/의존성은 그대로 설치돼 있어야 함).
+또는 프로젝트 루트의 [마비노비.exe](../마비노비.exe)를 더블클릭 — `main.py`를 PyInstaller `--onefile`로 직접 빌드한 완전 독립 실행 파일이라(2026-09-19~) Python도, 이 프로젝트 폴더도 필요 없이 exe 하나만 있으면 바로 실행된다. 빌드 명령은 `50_APP/`에서:
+```
+python -m PyInstaller --onefile --noconsole --name "마비노비" --distpath .. --add-data "app/dashboard/assets;app/dashboard/assets" --add-data "app/dashboard/AI_CONNECTOR_ON_1.png;app/dashboard" --add-data "app/dashboard/AI_CONNECTOR_ON_2.png;app/dashboard" main.py
+```
 
 ## 구성
 

@@ -5,6 +5,16 @@ the game on its own at startup. The onboarding wizard (app/onboarding/wizard.py)
 opened on demand, from the dashboard's "설치 마법사" button.
 
     python 50_APP/main.py
+
+Also the entry point PyInstaller builds the standalone 마비노비.exe from directly (2026-09-19
+- the whole app + its assets get bundled into one file, so end users need nothing but the
+exe: no system Python, no project folder alongside it). PROJECT_ROOT has to account for both
+cases: when frozen, __file__ doesn't point anywhere meaningful on disk (PyInstaller extracts
+into a temp dir), so it's derived from sys.executable's own location (wherever the user put
+the exe) instead - same pattern launcher/launch_mabinobi.py already used for the same reason.
+그 project_root는 온보딩 마법사/사용 가이드(40_ONBOARDING, 10_RESEARCH, 30_MCP_SERVER 참조)
+전용이라, 순수 단독 exe로 배포된 경우 그 폴더들이 없으면 해당 버튼들만 "못 찾음"으로 우아하게
+정도로 실패한다 - 대시보드 핵심 기능(스탯/재화/가공 무한/JOB 대기열/음악)엔 영향 없음.
 """
 
 import sys
@@ -16,7 +26,10 @@ from PySide6.QtWidgets import QApplication
 
 from app.dashboard.main_window import DashboardWindow
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if getattr(sys, "frozen", False):
+    PROJECT_ROOT = Path(sys.executable).resolve().parent
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def apply_dark_theme(app: QApplication) -> None:

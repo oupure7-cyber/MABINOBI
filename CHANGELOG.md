@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-19 (진짜 단일 파일 exe로 전환 — 얇은 런처 방식 폐기, launcher/ 삭제)
+
+- 사용자 요청: "내가 원했던건 py 파일들 뭐시기들 다 필요없고 exe 있으면 다 동작하게 만드는것이긴해" — 바로 아래 항목("배포용 런처 강화")의 `launcher/launch_mabinobi.py` 방식은 exe가 여전히 시스템 Python을 찾아 `50_APP/main.py`를 대신 실행해주는 "얇은 런처"일 뿐이라, exe 옆에 프로젝트 폴더 전체가 있어야 동작했음 — 이 방식 자체를 폐기하고 `50_APP/main.py`를 PyInstaller로 직접 빌드하는 진짜 단일 파일(onefile) 번들로 전환
+- `50_APP/main.py`: `PROJECT_ROOT`를 frozen 여부에 따라 분기 — `sys.frozen`이면 `Path(sys.executable).resolve().parent`(exe 위치), 아니면 기존처럼 `Path(__file__).resolve().parent.parent`. frozen일 땐 `__file__`이 PyInstaller가 임시 폴더에 풀어놓은 경로를 가리켜 의미가 없어서 실행 파일 자기 자신의 위치를 기준으로 삼아야 함(`launcher/launch_mabinobi.py`가 쓰던 것과 같은 패턴)
+- 새 빌드 명령(`50_APP/`에서 실행, 결과물은 프로젝트 루트에 생성):
+  ```
+  python -m PyInstaller --onefile --noconsole --name "마비노비" --distpath .. --add-data "app/dashboard/assets;app/dashboard/assets" --add-data "app/dashboard/AI_CONNECTOR_ON_1.png;app/dashboard" --add-data "app/dashboard/AI_CONNECTOR_ON_2.png;app/dashboard" main.py
+  ```
+  PySide6/Qt + `app/` 패키지 전체 + 재화 아이콘 28개 + 커넥터 가이드 스크린샷 2장까지 exe 하나(약 45.8MB, 기존 얇은 런처는 약 7.4MB)에 전부 번들링됨
+- **검증**: 완전히 빈 임시 폴더(`AppData\Local\Temp\...\standalone_exe_test`)에 `마비노비.exe` 하나만 복사해서 실행 → Win32 API(`EnumWindows`+`GetWindowTextW`, PowerShell P/Invoke)로 실제 "마비노비" 창이 뜨는 것까지 확인. 다른 파일(프로젝트 폴더, Python 등) 전혀 없이 동작함이 실측으로 확인됨
+- `launcher/` 폴더 전체 삭제(`launch_mabinobi.py` 포함) — 이제 존재 이유가 없음(빌드도 실행도 `50_APP/main.py`를 직접 사용)
+- 알려진 한계(문서화): `설치 마법사`/`사용 가이드` 버튼은 `40_ONBOARDING`/`10_RESEARCH`/`.mcp.json`을 프로젝트 폴더에서 찾는 기능이라, exe만 단독으로 있으면 "못 찾음"으로 우아하게 실패함(Claude Code 연동 전용 기능이라 대시보드 핵심 기능엔 영향 없음)
+- 문서 갱신: 루트 `README.md`(마비노비.exe 설명 + `launcher` 행 삭제), `50_APP/README.md`(실행 섹션에서 launcher 언급 제거, 새 빌드 명령 추가), `40_ONBOARDING/01_사용자_설치_가이드.md` 상단 안내(launcher 자동 설치 언급 → "Python/PySide6조차 필요 없이 exe 하나만 있으면 실행" 으로 수정)
+
 ## 2026-09-19 (배포용 런처 강화 — Python/PySide6 자동 감지·설치, exe 재빌드)
 
 - 사용자 요청: 일반 사용자가 `마비노비.exe`만 받아도 바로 쓸 수 있도록, 본격 실행 전에 Python/필요 패키지 설치 여부를 확인하고 없으면 설치해주는 흐름 추가

@@ -21,8 +21,7 @@
 | [50_APP](50_APP) | 구현 — **마비노비**, PySide6 데스크톱 앱. 설치 마법사(40_ONBOARDING을 화면으로 구현, 버튼으로 열림), 대시보드(스탯/재화 조회), "가공 무한" 자동 루틴(강철괴/목재+/옷감+/가죽+ 4종 동시), 음악 플레이어(대기열/악기 변경), JOB 대기열(우측 컬럼 — 유한한 자동화 작업을 순서대로 반복 실행. 카탈로그에 "가공무한 1시간", "야채볶음10개"/"야채볶음 50개", 채집 JOB 25종 — 예전 채집 바로가기 버튼을 대체) |
 | [81_GUIDE_MD](81_GUIDE_MD) | 넥슨 공식 AI 커넥터 안내 페이지를 정리한 마크다운 요약 (원본 HTML 스크랩은 로그인 세션 정보가 섞여있어 저장소에서 제외함) |
 | [.mcp.json](.mcp.json) | Claude Code/Codex 등 MCP 클라이언트용 서버 등록 파일 (Claude Code는 자동 인식, Codex는 `~/.codex/config.toml`에 별도 등록 필요 — [40_ONBOARDING](40_ONBOARDING) 참고) |
-| [마비노비.exe](마비노비.exe) | **더블클릭 실행 런처.** `launcher/launch_mabinobi.py`를 PyInstaller로 빌드. 앱 자체를 번들링하진 않고 시스템 Python으로 `50_APP/main.py`를 실행만 해주는 얇은 실행기지만, Python이나 PySide6가 없으면 감지해서 자동 설치(winget/pip)까지 해준다(2026-09-19~) — 일반 사용자가 exe 하나만 받아도 바로 쓸 수 있는 걸 목표로 함 |
-| [launcher](launcher) | 위 exe의 소스 (`launch_mabinobi.py`) |
+| [마비노비.exe](마비노비.exe) | **완전 독립형 실행 파일.** `50_APP/main.py`를 PyInstaller `--onefile`로 직접 빌드 — PySide6/앱 코드/아이콘 에셋까지 전부 exe 하나에 번들링되어 있어서, **이 exe 파일 하나만 있으면** 다른 어떤 파일도 없이(Python도 필요 없음) 바로 실행된다(2026-09-19~, 격리된 빈 폴더에 exe만 복사해서 실제로 확인함). 단, `설치 마법사`/`사용 가이드` 버튼은 `40_ONBOARDING`/`10_RESEARCH`/`.mcp.json`을 프로젝트 폴더에서 찾는 기능이라 exe만 단독으로 있으면 "못 찾음"으로 우아하게 실패함(Claude Code 연동 전용 기능이라 데스크톱 앱 핵심 기능엔 영향 없음) |
 | [CHANGELOG.md](CHANGELOG.md) | 진행 로그 |
 
 ## 현재 진행 상태
