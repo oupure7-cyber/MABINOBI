@@ -30,7 +30,6 @@ and shows instructions once the GUI starts.
 from __future__ import annotations
 
 import ctypes
-import json
 import os
 import shutil
 import subprocess
@@ -127,16 +126,23 @@ def candidate_pythons() -> list[str]:
     candidates: list[str] = []
     seen: set[str] = set()
 
+    def add(exe: str) -> None:
+        norm = os.path.normcase(exe)
+        if os.path.isfile(exe) and norm not in seen:
+            seen.add(norm)
+            candidates.append(exe)
+
+    # A project-local virtualenv (.venv, if someone's set one up next to the project) wins
+    # over whatever's on PATH - keeps a dev's own pinned environment authoritative.
+    add(str(app_root() / ".venv" / "Scripts" / "python.exe"))
+
     for directory in os.environ.get("PATH", "").split(os.pathsep):
         if not directory:
             continue
         exe = os.path.join(directory, "python.exe")
         if "WindowsApps" in exe:
             continue
-        norm = os.path.normcase(exe)
-        if os.path.isfile(exe) and norm not in seen:
-            seen.add(norm)
-            candidates.append(exe)
+        add(exe)
 
     # Fallback: the python.org/winget default per-user install location, in case PATH hasn't
     # picked it up yet even after a registry refresh.
@@ -145,11 +151,7 @@ def candidate_pythons() -> list[str]:
         programs = Path(local_appdata) / "Programs" / "Python"
         if programs.is_dir():
             for entry in sorted(programs.glob("Python3*"), reverse=True):
-                exe = entry / "python.exe"
-                norm = os.path.normcase(str(exe))
-                if exe.is_file() and norm not in seen:
-                    seen.add(norm)
-                    candidates.append(str(exe))
+                add(str(entry / "python.exe"))
 
     return candidates
 
@@ -256,6 +258,13 @@ def install_requirements(python_exe: str, requirements: Path) -> bool:
 
 
 def main() -> None:
+    # PyInstaller's onefile bootloader narrows the frozen process's DLL search path to its own
+    # bundle dir; that's inherited by the system python.exe we spawn below and can break ITS
+    # own DLL loading (python3xx.dll, Qt, ...) if left in place. Reset it before we do anything
+    # else (friend's fix, found independently while testing on a machine where this mattered).
+    if getattr(sys, "frozen", False) and os.name == "nt":
+        ctypes.windll.kernel32.SetDllDirectoryW(None)
+
     root = app_root()
     main_py = root / "50_APP" / "main.py"
     requirements = root / "50_APP" / "requirements.txt"
