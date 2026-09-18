@@ -19,7 +19,14 @@ from pathlib import Path
 from typing import Optional
 
 GITHUB_REPO = "oupure7-cyber/MABINOBI"
-ASSET_NAME = "마비노비.exe"
+# ASCII on purpose - confirmed empirically (2026-09-19, first real release) that GitHub
+# silently rejects non-ASCII release asset filenames: uploading with a Korean name became
+# "default.exe" server-side, and renaming it to Korean afterward was silently a no-op,
+# while renaming to an ASCII name worked instantly. This is purely a GitHub-side asset
+# identifier though - it never touches the local file's actual name. The exe on a user's
+# disk stays whatever they named it (마비노비.exe); apply_update_and_relaunch() derives the
+# downloaded file's local name from the *running* exe's own name, never from this constant.
+ASSET_NAME = "MabiNobi.exe"
 _TIMEOUT = 10
 
 # Bridge/redirect mechanism (2026-09-19, built ahead of ever needing it - see CHANGELOG).
