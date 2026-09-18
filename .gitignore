@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Claude Code local settings (machine-specific, not shared)
+.claude/settings.local.json
+
+# Codex local settings (if ever created inside the repo)
+.codex/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# PyInstaller build artifacts (마비노비.exe is committed on purpose; these are just build leftovers)
+build/
+dist/
+*.spec

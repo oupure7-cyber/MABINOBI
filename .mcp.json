@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mabinogi-ai-connector": {
+      "command": "python",
+      "args": ["30_MCP_SERVER/server.py"]
+    }
+  }
+}
