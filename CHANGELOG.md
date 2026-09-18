@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-19 (첫 실제 배포: GitHub Release v0.9.0 게시 — GitHub 자산명은 ASCII만 허용된다는 것 실측으로 발견/수정)
+
+- 사용자 요청으로 첫 GitHub Release 생성: `APP_VERSION`을 `1.0.0` → `0.9.0`으로 낮춰서 시작(아직 1.0을 붙이기엔 이르다는 판단), exe 재빌드 후 GitHub API로 Release 생성 + `마비노비.exe` 자산 업로드까지 전부 진행(`gh` CLI가 없어서 REST API를 PowerShell로 직접 호출)
+- **실측으로 발견한 중요 버그**: GitHub Release 자산(asset) 파일명에 한글을 쓰면 **조용히 씹힌다** — 업로드 시 `name=마비노비.exe` 쿼리파라미터를 줬는데 실제로는 `default.exe`로 저장됨, 이후 PATCH로 한글 이름으로 rename 시도해도 200 OK를 주면서 이름이 그대로 안 바뀜(반면 ASCII 이름으로 rename은 즉시 성공 — 대조 실험으로 원인을 ASCII 제한으로 확정). 이 상태로 뒀으면 `app/updater.py`의 `ASSET_NAME = "마비노비.exe"`가 앞으로 어떤 release를 올려도 영원히 매칭이 안 되는 치명적 버그였음
+- 수정: `ASSET_NAME`을 `"MabiNobi.exe"`(ASCII)로 변경. **로컬 파일명에는 전혀 영향 없음** — `apply_update_and_relaunch()`는 다운로드한 파일을 "현재 실행 중인 exe 자신의 이름"으로 저장/교체하는 구조라, GitHub 쪽 식별용 자산명과 사용자 PC의 실제 파일명(`마비노비.exe`, 한글 그대로)은 완전히 분리되어 있었음 — 그래서 이 수정은 자산 식별자 하나만 ASCII로 바꾸면 끝
+- 오프라인 테스트를 하드코딩된 `"마비노비.exe"` 대신 `updater.ASSET_NAME`을 참조하도록 수정 + `ASSET_NAME.isascii()` 검증 케이스 추가(이런 실수가 다시 나면 테스트에서 바로 걸리게)
+- exe 재빌드 → 잘못 업로드됐던 `default.exe` 자산 삭제 → 올바른 `MabiNobi.exe` 이름으로 재업로드
+- **실제 GitHub Release를 상대로 한 진짜 종단 테스트**(모킹 없이): `check_for_update("0.8.0")`가 실제로 `v0.9.0`을 찾아내고 올바른 다운로드 URL을 반환하는지, `check_for_update("0.9.0")`(이미 최신)이 `None`을 반환하는지, `download_asset()`으로 실제 파일을 내려받아 업로드한 것과 바이트 크기가 일치하는지(46,399,174 bytes)까지 전부 실측 확인
+- 배포 링크: https://github.com/oupure7-cyber/MABINOBI/releases/tag/v0.9.0
+
 ## 2026-09-19 (Claude Code/MCP 채팅 연동 제거 — 설치 마법사 + 30_MCP_SERVER + .mcp.json + 40_ONBOARDING)
 
 - 사용자 요청: "이제 더 이상 Claude에게 요청하는 기능은 지원 안 할 거 같아(나중에 바꿀 수도 있음). 설치 마법사와 그와 관련된 모든 연동 기능은 지금은 제거해줘" — 데스크톱 앱에서 "화면으로 조회/제어"만 남기고, "채팅으로 Claude에게 요청"하는 별개 사용 방식(Claude Code/MCP)은 당분간 완전히 빼기로 함
