@@ -5,9 +5,14 @@ exactly what AlteringRoutineWorker's `duration_seconds` (see altering_routine.py
 for. Any future JOB type just needs to expose the same shape: a QThread-like worker with
 `status`/`blocked`/`stopped` signals and a `request_stop()` method - register it in
 JOB_CATALOG and it shows up in the searchable catalog at the bottom of the column for free.
-"야채볶음10개"/"야채볶음 50개" are a second, different JOB shape (food_crafting_job.py,
+"요리: 야채 볶음 x10"/"요리: 야채 볶음 x50" are a second, different JOB shape (food_crafting_job.py,
 FoodCraftWorker): gather whatever raw ingredients are short, then execute_crafting the target
 count once and finish - a one-shot worker rather than a repeating routine.
+
+A third, even simpler shape (gather_job.py, GatherJobWorker) replaces the old always-visible
+채집 바로가기 button grid (removed from gather_panel.py 2026-09-18): one execute_gathering call
+for a fixed item, named "채집: <이름> x100" (the queue's own ◀ N ▶ stepper covers repeating it
+past one 100-item call, same as every other JOB here).
 
 Layout: a "현재 작업" header, a single QListWidget showing the running job (row 0, if any,
 highlighted) followed by pending jobs, a trash drop zone, then a search box + catalog list
@@ -58,6 +63,7 @@ from PySide6.QtWidgets import (
 
 from .altering_routine import AlteringRoutineWorker
 from .food_crafting_job import FoodCraftWorker, Ingredient
+from .gather_job import GATHER_ITEMS, GatherJobWorker
 
 MIN_REPEATS = 1
 MAX_REPEATS = 9
@@ -100,11 +106,24 @@ def _make_veggie_stir_fry_50() -> FoodCraftWorker:
     return _make_veggie_stir_fry(50, 5)
 
 
+def _make_gather_job(display_name: str) -> Callable[[], GatherJobWorker]:
+    # A factory-returning-factory, not a bare lambda in the loop below - closes over
+    # `display_name` by value so every entry doesn't end up capturing the loop's last item.
+    def factory() -> GatherJobWorker:
+        return GatherJobWorker(display_name)
+
+    return factory
+
+
 JOB_CATALOG: list[JobSpec] = [
     JobSpec(key="altering_1h", name="가공무한 1시간", make_worker=_make_altering_1h),
-    JobSpec(key="veggie_stir_fry_10", name="야채볶음10개", make_worker=_make_veggie_stir_fry_10),
-    JobSpec(key="veggie_stir_fry_50", name="야채볶음 50개", make_worker=_make_veggie_stir_fry_50),
+    JobSpec(key="veggie_stir_fry_10", name="요리: 야채 볶음 x10", make_worker=_make_veggie_stir_fry_10),
+    JobSpec(key="veggie_stir_fry_50", name="요리: 야채 볶음 x50", make_worker=_make_veggie_stir_fry_50),
 ]
+JOB_CATALOG.extend(
+    JobSpec(key=f"gather_{item}", name=f"채집: {item} x100", make_worker=_make_gather_job(item))
+    for item in GATHER_ITEMS
+)
 JOB_CATALOG_BY_KEY: dict[str, JobSpec] = {spec.key: spec for spec in JOB_CATALOG}
 
 

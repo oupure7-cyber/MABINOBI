@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..cli_client import run_cli
-from .widgets import classify_cli_result
+from .widgets import FlowLayout, classify_cli_result
 
 POLL_INTERVAL_MS = 4000
 
@@ -93,8 +93,13 @@ class TrashZone(QLabel):
 
 
 class InstrumentBar(QWidget):
-    """Horizontal row of owned-instrument buttons below the player. Clicking one calls
-    change_instrument; the equipped one is shown checked."""
+    """Owned-instrument buttons below the player, wrapped into as many rows as the current
+    width needs (FlowLayout, widgets.py) instead of one horizontally-scrolling row - grows to
+    N rows as the owned-instrument count grows, capped by MAX_HEIGHT with a vertical scrollbar
+    beyond that (user call, 2026-09-18: only ~2 rows today, but plan for it growing past that).
+    Clicking a button calls change_instrument; the equipped one is shown checked."""
+
+    MAX_HEIGHT = 120  # roughly 3-4 rows before it scrolls instead of eating the whole panel
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -108,14 +113,12 @@ class InstrumentBar(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setFixedHeight(56)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setMaximumHeight(self.MAX_HEIGHT)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         host = QWidget()
-        self._row = QHBoxLayout(host)
-        self._row.setContentsMargins(4, 4, 4, 4)
-        self._row.setSpacing(6)
+        self._row = FlowLayout(host, spacing=6)
         scroll.setWidget(host)
         outer.addWidget(scroll)
 
@@ -132,7 +135,6 @@ class InstrumentBar(QWidget):
         data = run_cli("get_instruments")
         if not isinstance(data, list):
             self._row.addWidget(QLabel("⚠️ 악기 목록을 불러오지 못했습니다."))
-            self._row.addStretch(1)
             return
 
         for entry in data:
@@ -142,7 +144,6 @@ class InstrumentBar(QWidget):
             btn.setChecked(bool(entry.get("IsEquipped", False)))
             btn.clicked.connect(lambda _checked=False, n=name: self._change_instrument(n))
             self._row.addWidget(btn)
-        self._row.addStretch(1)
 
     def _change_instrument(self, name: str) -> None:
         data = run_cli("change_instrument", json.dumps({"name": name}, ensure_ascii=False))

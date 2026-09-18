@@ -39,6 +39,24 @@ TOP_STATS_LAYOUT = [
     ["STR", "DEX", "INT", "LUCK"],
 ]
 
+# Emoji stand-in for each stat (user call, 2026-09-19 - tried cropped icons from a screenshot
+# first, decided plain emoji was simpler/good enough and dropped the crops).
+STAT_EMOJI = {
+    "CombatScore": "🏆",
+    "LivingScore": "🌿",
+    "AttractivenessScore": "💖",
+    "ArcaneResistance": "🔮",
+    "AttackPower": "🗡️",
+    "HealthMax": "❤️",
+    "DefencePower": "🛡️",
+    "DecorScore": "👑",
+    "STR": "👊",
+    "DEX": "🤚",
+    "INT": "🧠",
+    "LUCK": "🍀",
+}
+STAT_ICON_SIZE = 22
+
 
 class TopStatsPanel(QWidget):
     """Fixed 4x3 grid of hand-picked get_my_info stats, shown top-left of the window."""
@@ -65,12 +83,25 @@ class TopStatsPanel(QWidget):
                 name_label.setStyleSheet("color: #9a9aa2; font-size: 10px;")
                 value_label = QLabel("-")
                 value_label.setStyleSheet("color: #f0f0f0; font-size: 13px; font-weight: 600;")
-                cell = QVBoxLayout()
-                cell.setSpacing(0)
-                cell.addWidget(name_label)
-                cell.addWidget(value_label)
+                text_col = QVBoxLayout()
+                text_col.setSpacing(0)
+                text_col.addWidget(name_label)
+                text_col.addWidget(value_label)
+
+                cell = QHBoxLayout()
+                cell.setSpacing(6)
+                cell.addWidget(self._make_stat_icon(key))
+                cell.addLayout(text_col)
                 self._grid.addLayout(cell, row, col)
                 self._cells[key] = (name_label, value_label)
+
+    @staticmethod
+    def _make_stat_icon(key: str) -> QLabel:
+        icon_label = QLabel(STAT_EMOJI.get(key, ""))
+        icon_label.setFixedSize(STAT_ICON_SIZE, STAT_ICON_SIZE)
+        icon_label.setAlignment(Qt.AlignCenter)
+        icon_label.setStyleSheet("font-size: 15px;")
+        return icon_label
 
     def set_data(self, data) -> None:
         if not isinstance(data, dict) or "error" in data:

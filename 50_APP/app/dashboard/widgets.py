@@ -5,13 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PySide6.QtCore import Property, QPropertyAnimation, Qt, QTimer
+from PySide6.QtCore import Property, QPoint, QPropertyAnimation, QRect, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QAbstractButton,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -73,6 +74,78 @@ class ToggleSwitch(QAbstractButton):
         painter.drawRoundedRect(0, 0, self.width(), self.height(), 12, 12)
         painter.setBrush(QColor("#ffffff"))
         painter.drawEllipse(self._offset, 3, 18, 18)
+
+
+class FlowLayout(QLayout):
+    """Qt's standard "Flow Layout" recipe: lays child widgets left-to-right, wrapping to a new
+    row whenever the next one wouldn't fit the available width, and reports heightForWidth so
+    the container grows to fit however many rows that takes - used by InstrumentBar
+    (music_panel.py) so the owned-instrument button row becomes N rows instead of one
+    horizontally-scrolling row as the window width changes or the instrument count grows."""
+
+    def __init__(self, parent=None, margin: int = 0, spacing: int = 6):
+        super().__init__(parent)
+        if parent is not None:
+            self.setContentsMargins(margin, margin, margin, margin)
+        self.setSpacing(spacing)
+        self._items: list = []
+
+    def addItem(self, item) -> None:  # noqa: N802 - Qt override
+        self._items.append(item)
+
+    def count(self) -> int:
+        return len(self._items)
+
+    def itemAt(self, index: int):  # noqa: N802 - Qt override
+        return self._items[index] if 0 <= index < len(self._items) else None
+
+    def takeAt(self, index: int):  # noqa: N802 - Qt override
+        return self._items.pop(index) if 0 <= index < len(self._items) else None
+
+    def expandingDirections(self):  # noqa: N802 - Qt override
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802 - Qt override
+        return True
+
+    def heightForWidth(self, width: int) -> int:  # noqa: N802 - Qt override
+        return self._do_layout(QRect(0, 0, width, 0), test_only=True)
+
+    def setGeometry(self, rect: QRect) -> None:  # noqa: N802 - Qt override
+        super().setGeometry(rect)
+        self._do_layout(rect, test_only=False)
+
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt override
+        return self.minimumSize()
+
+    def minimumSize(self) -> QSize:
+        size = QSize()
+        for item in self._items:
+            size = size.expandedTo(item.minimumSize())
+        margins = self.contentsMargins()
+        size += QSize(margins.left() + margins.right(), margins.top() + margins.bottom())
+        return size
+
+    def _do_layout(self, rect: QRect, *, test_only: bool) -> int:
+        left, top, right, bottom = self.getContentsMargins()
+        effective = rect.adjusted(left, top, -right, -bottom)
+        x, y = effective.x(), effective.y()
+        line_height = 0
+        spacing = self.spacing()
+
+        for item in self._items:
+            next_x = x + item.sizeHint().width() + spacing
+            if next_x - spacing > effective.right() and line_height > 0:
+                x = effective.x()
+                y += line_height + spacing
+                next_x = x + item.sizeHint().width() + spacing
+                line_height = 0
+            if not test_only:
+                item.setGeometry(QRect(QPoint(x, y), item.sizeHint()))
+            x = next_x
+            line_height = max(line_height, item.sizeHint().height())
+
+        return y + line_height - rect.y() + bottom
 
 
 class Toast(QLabel):
@@ -145,7 +218,7 @@ class CurrencyColumn(QScrollArea):
         inner = QWidget()
         self._layout = QVBoxLayout(inner)
         self._layout.setContentsMargins(8, 8, 8, 8)
-        self._layout.setSpacing(6)
+        self._layout.setSpacing(3)
         self.setWidget(inner)
 
     def set_data(self, rows) -> None:
@@ -168,22 +241,26 @@ class CurrencyColumn(QScrollArea):
             self._layout.addWidget(self._make_row(name, amount))
         self._layout.addStretch(1)
 
+    # 80% of the original 26px icon (user call, 2026-09-18 - rows were too tall / too much
+    # scrolling), with tighter chip padding/spacing to match.
+    ICON_SIZE = 21
+
     def _make_row(self, name: str, amount) -> QWidget:
         chip = QFrame()
         chip.setStyleSheet("QFrame { background-color: #2b2b30; border-radius: 8px; }")
         chip.setToolTip(name)
         layout = QHBoxLayout(chip)
-        layout.setContentsMargins(8, 6, 8, 6)
-        layout.setSpacing(8)
+        layout.setContentsMargins(6, 3, 8, 3)
+        layout.setSpacing(6)
 
         icon_label = QLabel()
-        icon_label.setFixedSize(26, 26)
+        icon_label.setFixedSize(self.ICON_SIZE, self.ICON_SIZE)
         fname = self._manifest.get(name)  # icon lookup always uses the full, untruncated name
         if fname:
             pixmap = QPixmap(str(CURRENCY_ICON_DIR / fname))
             if not pixmap.isNull():
                 icon_label.setPixmap(
-                    pixmap.scaled(26, 26, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    pixmap.scaled(self.ICON_SIZE, self.ICON_SIZE, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 )
         layout.addWidget(icon_label)
 
