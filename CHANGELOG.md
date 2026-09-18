@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-09-19 (배포용 런처 강화 — Python/PySide6 자동 감지·설치, exe 재빌드)
+
+- 사용자 요청: 일반 사용자가 `마비노비.exe`만 받아도 바로 쓸 수 있도록, 본격 실행 전에 Python/필요 패키지 설치 여부를 확인하고 없으면 설치해주는 흐름 추가
+- `launcher/launch_mabinobi.py` 대폭 강화(여전히 stdlib만 사용 — PySide6/프로젝트 임포트 없음, 그래야 PyInstaller 번들이 작고 50_APP이 바뀌어도 재빌드 불필요):
+  - Python 탐색(WindowsApps 스텁 제외) 후 없으면 winget으로 자동 설치 제안(사용자 확인 후 진행) → winget도 없으면 python.org 다운로드 페이지를 브라우저로 열어줌
+  - `50_APP/requirements.txt`의 패키지(PySide6)가 import되는지 확인, 안 되면 `pip install -r`으로 자동 설치
+  - 평소(이미 다 설치된 경우)는 기존처럼 콘솔 없이 즉시 조용히 실행 — 설치가 실제로 필요할 때만 `AllocConsole`로 콘솔을 띄워 진행 상황을 보여줌(안 그러면 몇 분간 멈춘 것처럼 보임)
+  - winget/pip 설치 후 PATH가 바로 반영 안 되는 문제 대응: 레지스트리(`HKLM`/`HKCU`의 `Environment`)에서 PATH를 다시 읽어 `os.environ`에 반영(이번 세션 내내 PowerShell에서 수동으로 하던 것과 동일한 처리)
+  - 실행 직후 빠른 크래시 감지(2초 후 프로세스 생존 확인) 추가 - 안내 없이 조용히 실패하는 상황 방지
+  - 버그 발견/수정: `app_root()`의 unfrozen(스크립트로 직접 실행) 분기가 `launcher/` 폴더 자체를 프로젝트 루트로 착각하고 있었음(`Path(__file__).parent`) — 빌드된 exe(frozen)는 영향 없었지만(그 분기는 `sys.executable`의 부모 디렉터리를 씀, 실제 배포 시 정상), 로컬에서 스크립트로 직접 테스트할 때 즉시 발견됨 → `.parent.parent`로 수정
+- 다른 프로그램/프레임워크가 더 필요한지 점검: 없음 — Windows 10/11엔 PySide6/Qt가 요구하는 C 런타임이 이미 기본 포함되어 있어 VC++ 재배포 패키지 등 추가 설치가 필요 없음. Node.js/Claude Code/mcp 패키지는 Claude Code 채팅 연동(`30_MCP_SERVER`) 전용이라 데스크톱 앱 실행엔 무관 — `40_ONBOARDING/01_사용자_설치_가이드.md` 상단에 이 구분을 명시
+- `python launcher/launch_mabinobi.py`로 직접 실행 + `마비노비.exe` 더블클릭(`Start-Process`) 둘 다 실제로 `50_APP/main.py`가 정상 기동되는 것까지 라이브 확인. 오프라인 단위 테스트로 `resolve_python`/`requirements_satisfied`(정상 패키지 및 존재하지 않는 가짜 패키지 케이스)/`refresh_path_from_registry`/`app_root()` 검증
+- exe 재빌드(`python -m PyInstaller --onefile --noconsole --name "마비노비"`), 프로젝트 루트에 커밋
+- 문법 검사 통과
+
 ## 2026-09-19 (스탯 패널 아이콘 → 크롭 대신 전부 이모지로 단순화)
 
 - 사용자 요청: 바로 직전에 스크린샷에서 크롭한 9개 아이콘 파일은 빼고, 12개 스탯 전부 이모지로 통일
