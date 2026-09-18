@@ -90,7 +90,7 @@ class GatherPanel(QWidget):
         title.setStyleSheet("color: #aaa; font-size: 11px;")
         outer.addWidget(title)
 
-        self._steel_btn = QPushButton("🔁 가공 무한 시작 (강철괴/목재+/옷감+/가죽+)")
+        self._steel_btn = QPushButton("🔁 가공 무한 시작 (강철괴/목재+/옷감+/가죽+) (티르코네일+숲길잡이+흰까마귀+검술)")
         self._steel_btn.setStyleSheet(
             "QPushButton { background-color: #3a2f1a; color: #f0c060; font-weight: 600; padding: 6px; }"
         )
@@ -215,7 +215,7 @@ class GatherPanel(QWidget):
     def _on_steel_stopped(self) -> None:
         self._steel_worker = None
         self._steel_btn.setEnabled(True)
-        self._steel_btn.setText("🔁 가공 무한 시작 (강철괴/목재+/옷감+/가죽+)")
+        self._steel_btn.setText("🔁 가공 무한 시작 (강철괴/목재+/옷감+/가죽+) (티르코네일+숲길잡이+흰까마귀+검술)")
         self._set_busy(False)
 
     def _on_dashboard_destroyed(self, *_args) -> None:
