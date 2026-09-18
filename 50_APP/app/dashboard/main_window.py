@@ -1,8 +1,13 @@
 """Main dashboard: read-only live views over the game state, built on direct
-MabinogiMobile_CLI.exe calls (see app/cli_client.py). No menu bar, no onboarding wizard
-on launch - the app tries to connect on its own and only asks for help if that fails.
-Scheduled/conditional automation (F1-F4 in 00_SPEC/03_requirements.md) is not implemented
-yet - this is the "see what's going on" half of the control app.
+MabinogiMobile_CLI.exe calls (see app/cli_client.py). No menu bar - the app tries to
+connect on its own and only asks for help if that fails. Scheduled/conditional automation
+(F1-F4 in 00_SPEC/03_requirements.md) is not implemented yet - this is the "see what's
+going on" half of the control app.
+
+(2026-09-19: the onboarding wizard and the Claude Code/MCP chat-integration surface it set
+up - 30_MCP_SERVER, 40_ONBOARDING, .mcp.json - were removed. The app no longer needs or
+supports "ask Claude in chat to do X"; only this direct-CLI dashboard/automation path
+remains. See CHANGELOG.md for why - kept out of scope "for now", not ruled out for good.)
 """
 
 from __future__ import annotations
@@ -24,7 +29,6 @@ from PySide6.QtWidgets import (
 )
 
 from ..cli_client import run_cli
-from ..onboarding.wizard import OnboardingWizard
 from ..updater import apply_update_and_relaunch
 from ..version import APP_VERSION
 from .connection import ConnectionCheckWorker
@@ -167,14 +171,10 @@ class DashboardWindow(QMainWindow):
 
         bar.addStretch(1)
 
-        bar.addWidget(QLabel("MCP 연결"))
+        bar.addWidget(QLabel("게임 연결"))
         self.connection_toggle = ToggleSwitch()
         self.connection_toggle.toggled.connect(self._on_toggle)
         bar.addWidget(self.connection_toggle)
-
-        wizard_btn = QPushButton("설치 마법사")
-        wizard_btn.clicked.connect(self.open_wizard)
-        bar.addWidget(wizard_btn)
 
         guide_btn = QPushButton("사용 가이드")
         guide_btn.clicked.connect(self.open_guide)
@@ -203,11 +203,6 @@ class DashboardWindow(QMainWindow):
         return row
 
     # -- connection ----------------------------------------------------------
-
-    def open_wizard(self) -> None:
-        wizard = OnboardingWizard(self.project_root, self)
-        wizard.exec()
-        self._try_connect()
 
     def open_guide(self) -> None:
         GuideDialog(self.project_root, self).exec()

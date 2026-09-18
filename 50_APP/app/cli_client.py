@@ -1,8 +1,8 @@
 """Direct wrapper around Nexon's MabinogiMobile_CLI.exe.
 
-Mirrors 30_MCP_SERVER/server.py's `_run_cli`, but this app calls the CLI directly instead
-of going through the MCP server - the dashboard doesn't need Claude Code running to show
-character info, it only needs the game client + this CLI (see 10_RESEARCH/01_ai_connector_interface.md).
+This app calls the CLI directly - the dashboard doesn't need Claude Code/MCP running to
+show character info, it only needs the game client + this CLI (see
+10_RESEARCH/01_ai_connector_interface.md).
 """
 
 import json

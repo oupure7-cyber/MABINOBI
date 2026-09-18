@@ -1,6 +1,6 @@
 # 마비노비 (MabiNobi)
 
-넥슨 공식 AI 커넥터 CLI(`MabinogiMobile_CLI.exe`)를 직접 호출하는 PySide6 데스크톱 앱. "마비노기"의 "노비"(옛 신분 — 시키는 대로 게임 잔심부름을 대신 해주는 존재라는 뜻의 말장난). Claude Code/MCP 없이도 동작한다 — MCP는 "Claude에게 대화로 요청" 용도이고, 이 앱은 "화면으로 조회/제어" 용도로 별개다.
+넥슨 공식 AI 커넥터 CLI(`MabinogiMobile_CLI.exe`)를 직접 호출하는 PySide6 데스크톱 앱. "마비노기"의 "노비"(옛 신분 — 시키는 대로 게임 잔심부름을 대신 해주는 존재라는 뜻의 말장난). 2026-09-19부로 Claude Code/MCP 채팅 연동 기능은 지원하지 않음(나중에 다시 붙일 수도 있음, [CHANGELOG.md](../CHANGELOG.md) 참고) — 이 앱은 순수하게 "화면으로 조회/제어"만 한다.
 
 ## 실행
 
@@ -16,12 +16,10 @@ python -m PyInstaller --onefile --noconsole --name "마비노비" --distpath .. 
 
 ## 구성
 
-- `main.py` — 진입점. 바로 대시보드로 진입 (설치 마법사는 자동으로 뜨지 않음, 버튼으로만 열림).
+- `main.py` — 진입점. 바로 대시보드로 진입.
 - `app/version.py` / `app/updater.py` / `app/dashboard/update_worker.py` — 자동 업데이트(2026-09-19). exe로 빌드된 경우(`sys.frozen`)에만 동작 — 시작 시 백그라운드로 GitHub Releases 최신 태그를 조회해 `app/version.py`의 `APP_VERSION`보다 높으면 조용히 다운로드해뒀다가, 가공 무한/JOB 대기열이 idle일 때 exe 자신을 교체하고 재시작함. GitHub 관련 UI/URL은 사용자에게 전혀 노출되지 않음. 새 버전 배포 절차: `APP_VERSION` 올리기 → exe 재빌드 → GitHub에 `vX.Y.Z` 태그로 Release 생성, `마비노비.exe` 이름 그대로 자산 첨부, Publish.
-- `app/cli_client.py` — `MabinogiMobile_CLI.exe` 서브프로세스 호출 래퍼 (`MABINOGI_CLI_PATH` 환경변수로 경로 변경 가능, 기본값은 `30_MCP_SERVER/server.py`와 동일).
-- `app/app_settings.py` — `QSettings` 기반 앱 상태(온보딩 완료 여부. 현재는 마법사가 수동 호출로만 열려 직접적인 게이팅 용도로는 안 쓰임).
-- `app/onboarding/` — 설치 마법사(`wizard.py`)와 환경 감지 로직(`checks.py`). [40_ONBOARDING/01_사용자_설치_가이드.md](../40_ONBOARDING/01_사용자_설치_가이드.md)의 6단계를 화면으로 구현. 대시보드 우상단 "설치 마법사" 버튼으로 열림.
-- `app/dashboard/` — 메인 화면. 레이아웃: 상단 컨트롤 바(스탯 4x3 + MCP 연결 토글/설치 마법사/사용 가이드) → 본문 좌측 재화 컬럼 + 중앙(상: 가공 무한 토글, 하: 음악 플레이어) + 우측 JOB 대기열 컬럼.
+- `app/cli_client.py` — `MabinogiMobile_CLI.exe` 서브프로세스 호출 래퍼 (`MABINOGI_CLI_PATH` 환경변수로 경로 변경 가능).
+- `app/dashboard/` — 메인 화면. 레이아웃: 상단 컨트롤 바(스탯 4x3 + 게임 연결 토글/사용 가이드) → 본문 좌측 재화 컬럼 + 중앙(상: 가공 무한 토글, 하: 음악 플레이어) + 우측 JOB 대기열 컬럼.
   - `main_window.py` — 메뉴바 없음. 앱 실행 시 `connection.py`(백그라운드 스레드)로 게임 연결 자동 시도, 실패 시 `connector_guide.py` 비모달 팝업(게임 내 AI 커넥터 활성화 안내 + 스크린샷 2장). `TopStatsPanel`(전투력/생활력/매력/마도저항/공격력/최대체력/방어력/데코점수/힘/솜씨/지력/행운, 4x3 고정 그리드)이 컨트롤 바 왼쪽에 있음. 중앙은 `QSplitter(Vertical)`로 `GatherPanel`/`MusicPanel` 분할, 오른쪽엔 고정폭 `JobQueuePanel`.
   - `widgets.py` — `ToggleSwitch`, `Toast`, `CurrencyColumn`(왼쪽 세로 스크롤 재화 목록, 일부 항목 숨김/이름 축약 규칙 포함), `classify_cli_result()`(CLI 응답 성공/실패 공용 판정 — 여러 패널이 재사용).
   - `gather_panel.py` — "🔁 가공 무한 시작" 토글 버튼(`altering_routine.py` 실행/정지) + 상태 라벨만 남음. 예전엔 채집 바로가기 버튼 25개도 있었지만 2026-09-18에 JOB 대기열로 이전하면서 제거됨.
@@ -36,8 +34,8 @@ python -m PyInstaller --onefile --noconsole --name "마비노비" --distpath .. 
 
 ## 알아둘 것
 
-- `.mcp.json`의 Python 경로는 설치 PC마다 다르다. 설치 마법사 5단계의 "이 PC용으로 자동 설정" 버튼이 현재 PC에서 감지된 Python 경로로 `.mcp.json`을 재작성해준다 (Claude Code로 대화형 사용을 하려는 유저 대상).
 - 정령의 날개를 소모하는 실행형 명령(`execute_gathering`, `execute_altering`, `execute_crafting`)은 **가공 무한 루틴**과 **JOB 대기열**(채집/제작 JOB들)로 실제로 호출된다. 추가/변경 시 [00_SPEC/02_scope_boundaries.md](../00_SPEC/02_scope_boundaries.md)와 공식 세이프가드(사용자 승인, `blocked` 자동 우회 금지)를 그대로 지켜야 한다.
+- Claude Code/MCP 채팅 연동(설치 마법사, `30_MCP_SERVER`, `40_ONBOARDING`, `.mcp.json`)은 2026-09-19에 **제거했다** — "채팅으로 Claude에게 요청" 방식은 당분간 지원하지 않기로 함(나중에 다시 붙일 수도 있음). 이 데스크톱 앱은 그 기능 없이도 완전히 독립적으로 동작한다.
 - **알려진 한계**: [00_SPEC/03_requirements.md](../00_SPEC/03_requirements.md)가 요구하는 "정령의 날개 하루 소모 상한 설정" 기능이 아직 없다 — 가공 무한 루틴/JOB 대기열 모두 사용자가 직접 정지해야 멈춘다(가공 무한 JOB은 시간제한으로 자동 종료됨).
 - 대화형 자유 텍스트 콘솔(`chat_console.py`)은 만들었다가 **제거했다** — 채집/조회 모두 각 패널·JOB이 직접 담당하는 방식으로 대체.
 - 게임 창을 앱 안에 재부모화(임베드)하는 기능도 시도했다가 **제거했다** — 안티치트(BlackCipher)에 의해 제대로 동작하지 않는 것으로 판단됨.

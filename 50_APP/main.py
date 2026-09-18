@@ -1,8 +1,7 @@
 """Entry point for 마비노비 (MabiNobi), the Mabinogi AI 자동화 제어 앱.
 
 Goes straight to the dashboard (app/dashboard/main_window.py), which tries to connect to
-the game on its own at startup. The onboarding wizard (app/onboarding/wizard.py) is only
-opened on demand, from the dashboard's "설치 마법사" button.
+the game on its own at startup.
 
     python 50_APP/main.py
 
@@ -11,10 +10,9 @@ Also the entry point PyInstaller builds the standalone 마비노비.exe from dir
 exe: no system Python, no project folder alongside it). PROJECT_ROOT has to account for both
 cases: when frozen, __file__ doesn't point anywhere meaningful on disk (PyInstaller extracts
 into a temp dir), so it's derived from sys.executable's own location (wherever the user put
-the exe) instead - same pattern launcher/launch_mabinobi.py already used for the same reason.
-그 project_root는 온보딩 마법사/사용 가이드(40_ONBOARDING, 10_RESEARCH, 30_MCP_SERVER 참조)
-전용이라, 순수 단독 exe로 배포된 경우 그 폴더들이 없으면 해당 버튼들만 "못 찾음"으로 우아하게
-정도로 실패한다 - 대시보드 핵심 기능(스탯/재화/가공 무한/JOB 대기열/음악)엔 영향 없음.
+the exe) instead. 그 project_root는 "사용 가이드" 버튼(10_RESEARCH 참조) 전용이라, 순수 단독
+exe로 배포된 경우 그 폴더가 없으면 해당 버튼만 "못 찾음"으로 우아하게 실패한다 - 대시보드 핵심
+기능(스탯/재화/가공 무한/JOB 대기열/음악)엔 영향 없음.
 """
 
 import sys

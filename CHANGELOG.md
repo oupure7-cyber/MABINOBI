@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-09-19 (Claude Code/MCP 채팅 연동 제거 — 설치 마법사 + 30_MCP_SERVER + .mcp.json + 40_ONBOARDING)
+
+- 사용자 요청: "이제 더 이상 Claude에게 요청하는 기능은 지원 안 할 거 같아(나중에 바꿀 수도 있음). 설치 마법사와 그와 관련된 모든 연동 기능은 지금은 제거해줘" — 데스크톱 앱에서 "화면으로 조회/제어"만 남기고, "채팅으로 Claude에게 요청"하는 별개 사용 방식(Claude Code/MCP)은 당분간 완전히 빼기로 함
+- 삭제한 것: `50_APP/app/onboarding/`(`wizard.py`, `checks.py`) — Node.js/Claude Code/계정/구독/Python-MCP/`.mcp.json` 연결/게임 커넥터까지 6단계를 화면으로 안내하던 설치 마법사 전체. `50_APP/app/proc_utils.py`(마법사 전용 터미널/URL 오프너, 다른 곳에서 안 씀). `50_APP/app/app_settings.py`(온보딩 완료 플래그만 있던 파일, 이미 게이팅용으로도 안 쓰이고 있었음 — README에 명시돼 있었음). `30_MCP_SERVER/`(MCP 서버 자체). `40_ONBOARDING/`(그 설치 가이드 문서). 프로젝트 루트 `.mcp.json`(MCP 클라이언트 등록 파일)
+- `main_window.py`: "설치 마법사" 버튼 + `open_wizard()` + `OnboardingWizard` import 제거. 덤으로 발견한 것 — 게임 연결 토글 옆 라벨이 "MCP 연결"이라고 잘못 붙어 있었음(실제로는 `cli_client.status()`로 게임 CLI 파이프를 직접 확인하는 거라 MCP와 무관, `connection.py` 확인해서 확정) → "게임 연결"로 수정
+- `main.py`/`main_window.py` 상단 docstring에서 온보딩 마법사/`40_ONBOARDING`/`30_MCP_SERVER` 언급 정리, 이번 제거의 배경과 "지금은 빼지만 나중에 되돌릴 수도 있다"는 의도를 주석으로 남김
+- 남긴 것 (MCP와 무관하게 계속 필요한 것들): `guide_viewer.py`("사용 가이드" 버튼, `10_RESEARCH`의 CLI 명령 레퍼런스를 보여줄 뿐 MCP 서버와 무관 — `cli_client.py`가 CLI를 직접 호출), `00_SPEC`/`10_RESEARCH`/`20_DESIGN`(기획/조사/설계 문서, 라이브 코드가 아니라 그대로 둠)
+- 문서 갱신: 루트 `README.md`(폴더 구조 표에서 `30_MCP_SERVER`/`40_ONBOARDING`/`.mcp.json` 행 삭제, exe 설명에서 "설치 마법사" 언급 제거, 현재 진행 상태에 "⏸️ MCP 채팅 연동 - 제거됨" 항목 추가), `50_APP/README.md`(구성 목록에서 `app/onboarding/`/`app/app_settings.py` 항목 삭제, "알아둘 것"에 제거 사실 명시)
+- 문법 검사(`py_compile`) 통과, 관련 없는 코드 참조가 남아있지 않은지 `grep`으로 재확인 후 exe 재빌드
+
+## 2026-09-19 (자동 업데이트에 bridge/redirect 예비 로직 추가 — 앱/자산 이름이 바뀌어도 구버전이 안 끊기게)
+
+- 사용자 질문: "배포 프로그램 이름이 바뀌거나 크게 바뀌면 자동 업데이트를 못 해주는 거 아니냐" — 맞는 지적. 바로 위 항목의 자동 업데이트는 `GITHUB_REPO`/`ASSET_NAME`이 이미 배포된 exe 코드에 고정으로 박혀있어서, 나중에 앱 이름/자산 파일명/저장소가 바뀌면 구버전들은 옛날 위치만 계속 찾다가 조용히 업데이트를 영영 못 받게 됨. 실제로 그런 일이 생기기 전에 미리 대비해달라는 요청
+- `50_APP/app/updater.py`에 **redirect(다리) 메커니즘**을 선제적으로 추가: `check_for_update`가 release를 진짜 최신 버전으로 취급하기 전에 먼저 `redirect.json`이라는 이름의 첨부 자산이 있는지 확인 → 있으면 그 release는 실제 버전이 아니라 `{"repo": "...", "asset_name": "..."}` 형태의 "포인터"로 취급하고, 그 안에 적힌 새 저장소/자산명으로 다시 조회(`MAX_REDIRECT_HOPS=3`회까지, 순환 리다이렉트 등 이상 상황에서도 무한루프 없이 안전하게 포기)
+- 핵심 아이디어: 이 리다이렉트를 "따라가는 코드" 자체를 지금(사용자가 거의 없는 이른 시점) 모든 신규 빌드에 미리 심어두는 것 — 그러면 나중에 진짜로 이름/저장소를 옮겨야 할 때, 예전 위치에 새 exe를 올릴 필요 없이 `redirect.json` 자산 하나만 달린 release를 예전 자리에 게시하면 이미 배포된 모든 구버전이 알아서 새 위치로 옮겨감
+- 오프라인 테스트 갱신(`_fetch_latest_release`가 이제 `repo` 인자를 받도록 시그니처 변경됨에 맞춰 모킹 수정) + 새 케이스 2개 추가: 리다이렉트를 실제로 한 번 따라가서 새 저장소/자산으로 최신 버전을 찾아내는지, 순환 리다이렉트가 와도 무한루프 없이 `None`으로 안전하게 포기하는지. 기존 케이스 전부 재확인 통과
+- 문법 검사 통과, exe 재빌드
+
 ## 2026-09-19 (GitHub Releases 기반 자동 업데이트 — exe가 알아서 최신 버전으로 갈아치움)
 
 - 사용자 요청: 배포한 `마비노비.exe`를 새 버전 낼 때마다 사용자들이 수동으로 재다운로드하지 않고, exe가 스스로 GitHub Release를 확인해서 조용히 업데이트하게 만들 것. 사용자(엔드유저)가 GitHub의 존재 자체를 모르게 — 팝업/URL 노출 없이.

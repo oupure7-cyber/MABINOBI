@@ -20,8 +20,23 @@ from typing import Optional
 
 GITHUB_REPO = "oupure7-cyber/MABINOBI"
 ASSET_NAME = "마비노비.exe"
-_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 _TIMEOUT = 10
+
+# Bridge/redirect mechanism (2026-09-19, built ahead of ever needing it - see CHANGELOG).
+# The problem it solves: every already-installed exe has GITHUB_REPO/ASSET_NAME baked into
+# its own compiled code, so it can only ever look in the one place it was built to look.
+# If the app/asset is ever renamed or moved to a different repo, old installs would just
+# silently stop finding updates forever - there's no way to reach out and patch code that's
+# already running on someone else's PC.
+#
+# The fix: before trusting a release as "the real latest", check whether it carries a
+# REDIRECT_ASSET_NAME asset instead. If it does, that release isn't a real version at all -
+# it's a pointer ({"repo": "...", "asset_name": "..."}) telling every client (new AND old,
+# since this redirect-following code ships in every build from now on) where to actually
+# look next. So migrating the app's identity later needs no special "bridge build" at the
+# old location at all - just publish one release there whose only content is this pointer.
+REDIRECT_ASSET_NAME = "redirect.json"
+MAX_REDIRECT_HOPS = 3
 
 
 def _parse_version(text: str) -> Optional[tuple[int, ...]]:
@@ -34,9 +49,10 @@ def _parse_version(text: str) -> Optional[tuple[int, ...]]:
         return None
 
 
-def _fetch_latest_release() -> Optional[dict]:
+def _fetch_latest_release(repo: str) -> Optional[dict]:
+    url = f"https://api.github.com/repos/{repo}/releases/latest"
     request = urllib.request.Request(
-        _API_URL,
+        url,
         headers={"User-Agent": "MabiNobi-Updater", "Accept": "application/vnd.github+json"},
     )
     try:
@@ -46,28 +62,58 @@ def _fetch_latest_release() -> Optional[dict]:
         return None
 
 
+def _fetch_redirect(assets: list[dict]) -> Optional[dict]:
+    """If this release is a bridge/redirect marker, return its {"repo", "asset_name"}
+    payload - else None (the overwhelmingly common case: a normal release)."""
+    marker = next((a for a in assets if a.get("name") == REDIRECT_ASSET_NAME), None)
+    url = marker.get("browser_download_url") if marker else None
+    if not url:
+        return None
+    request = urllib.request.Request(url, headers={"User-Agent": "MabiNobi-Updater"})
+    try:
+        with urllib.request.urlopen(request, timeout=_TIMEOUT) as response:
+            payload = json.load(response)
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return None
+    if not isinstance(payload, dict) or not payload.get("repo"):
+        return None
+    return payload
+
+
 def check_for_update(current_version: str) -> Optional[dict]:
     """None if already up to date (or offline / no releases yet / any hiccup), else
     {"version": "1.2.3", "download_url": "..."} for the newest published (non-draft,
-    non-prerelease) release with a 마비노비.exe asset attached."""
-    release = _fetch_latest_release()
-    if not isinstance(release, dict) or release.get("draft") or release.get("prerelease"):
-        return None
+    non-prerelease) release with a matching exe asset attached. Transparently follows
+    up to MAX_REDIRECT_HOPS bridge/redirect markers (see REDIRECT_ASSET_NAME above) before
+    giving up - a real migration would only ever need one hop, the cap is just a safety
+    net against a misconfigured or circular redirect chain."""
+    repo, asset_name = GITHUB_REPO, ASSET_NAME
 
-    latest = _parse_version(release.get("tag_name", ""))
-    current = _parse_version(current_version)
-    if latest is None or current is None or latest <= current:
-        return None
+    for _ in range(MAX_REDIRECT_HOPS):
+        release = _fetch_latest_release(repo)
+        if not isinstance(release, dict) or release.get("draft") or release.get("prerelease"):
+            return None
+        assets = release.get("assets", [])
 
-    asset = next(
-        (a for a in release.get("assets", []) if a.get("name") == ASSET_NAME),
-        None,
-    )
-    download_url = asset.get("browser_download_url") if asset else None
-    if not download_url:
-        return None
+        redirect = _fetch_redirect(assets)
+        if redirect:
+            repo = redirect.get("repo", repo)
+            asset_name = redirect.get("asset_name", asset_name)
+            continue
 
-    return {"version": release.get("tag_name", "").strip().lstrip("vV"), "download_url": download_url}
+        latest = _parse_version(release.get("tag_name", ""))
+        current = _parse_version(current_version)
+        if latest is None or current is None or latest <= current:
+            return None
+
+        asset = next((a for a in assets if a.get("name") == asset_name), None)
+        download_url = asset.get("browser_download_url") if asset else None
+        if not download_url:
+            return None
+
+        return {"version": release.get("tag_name", "").strip().lstrip("vV"), "download_url": download_url}
+
+    return None
 
 
 def download_asset(url: str, dest: Path) -> bool:
