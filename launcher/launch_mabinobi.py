@@ -20,11 +20,14 @@ def app_root() -> Path:
     file's own path when run as a plain script."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parent
+    return Path(__file__).resolve().parent.parent
 
 
 def find_python() -> str | None:
-    """Same WindowsApps-stub-skipping search as app/onboarding/checks.py's resolve_python."""
+    """Prefer the project environment, then fall back to Python on PATH."""
+    local_python = app_root() / ".venv" / "Scripts" / "python.exe"
+    if local_python.is_file():
+        return str(local_python)
     for directory in os.environ.get("PATH", "").split(os.pathsep):
         if not directory:
             continue
@@ -52,6 +55,22 @@ def main() -> None:
         show_error(
             "Python을 찾지 못했습니다.\n"
             "40_ONBOARDING/01_사용자_설치_가이드.md 를 참고해 Python을 설치한 뒤 다시 실행해주세요."
+        )
+        return
+
+    # PyInstaller changes DLL lookup paths; external Python needs its own DLLs.
+    if getattr(sys, "frozen", False) and os.name == "nt":
+        ctypes.windll.kernel32.SetDllDirectoryW(None)
+
+    check = subprocess.run(
+        [python_exe, "-c", "from PySide6.QtWidgets import QApplication"],
+        capture_output=True,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    if check.returncode:
+        show_error(
+            "PySide6를 불러오지 못했습니다. 다음 명령으로 필수 패키지를 설치해주세요.\n\n"
+            f'"{python_exe}" -m pip install -r "{root / "50_APP" / "requirements.txt"}"'
         )
         return
 
