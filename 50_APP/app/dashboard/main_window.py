@@ -27,6 +27,7 @@ from .connection import ConnectionCheckWorker
 from .connector_guide import ConnectorGuideDialog
 from .gather_panel import GatherPanel
 from .guide_viewer import GuideDialog
+from .job_queue import JobQueuePanel
 from .music_panel import MusicPanel
 from .widgets import CurrencyColumn, Toast, ToggleSwitch
 
@@ -95,7 +96,7 @@ class DashboardWindow(QMainWindow):
         super().__init__()
         self.project_root = project_root
         self.setWindowTitle("마비노비")
-        self.resize(1100, 750)
+        self.resize(1450, 750)  # widened for the JOB 대기열 right column (2026-09-18)
 
         self._connection_worker: ConnectionCheckWorker | None = None
         self._guide_dialog: ConnectorGuideDialog | None = None
@@ -147,6 +148,12 @@ class DashboardWindow(QMainWindow):
         center_split.addWidget(self.gather_panel)
         center_split.addWidget(self.music_panel)
         row.addWidget(center_split, 1)
+
+        self.job_queue_panel = JobQueuePanel()
+        self.job_queue_panel.setFixedWidth(320)
+        self.job_queue_panel.set_gather_panel(self.gather_panel)
+        self.gather_panel.set_job_queue_panel(self.job_queue_panel)
+        row.addWidget(self.job_queue_panel)
 
         return row
 

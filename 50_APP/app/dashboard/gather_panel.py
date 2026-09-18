@@ -81,6 +81,7 @@ class GatherPanel(QWidget):
         self._gather_worker: CliCallWorker | None = None
         self._steel_worker: AlteringRoutineWorker | None = None
         self._routine_dashboard: RoutineDashboard | None = None
+        self._job_queue_panel = None  # set via set_job_queue_panel() - avoids a circular import
         self._buttons: list[QPushButton] = []
 
         outer = QVBoxLayout(self)
@@ -118,6 +119,14 @@ class GatherPanel(QWidget):
         scroll.setWidget(grid_host)
         outer.addWidget(scroll, 1)
 
+    def set_job_queue_panel(self, panel) -> None:
+        self._job_queue_panel = panel
+
+    def is_busy(self) -> bool:
+        """Whether this panel currently has a worker calling the CLI - JobQueuePanel checks
+        this before starting a JOB, same one-caller-at-a-time constraint as everywhere else."""
+        return self._gather_worker is not None or self._steel_worker is not None
+
     def _lookup_gatherable(self, item_name: str) -> dict | None:
         lookup = run_cli("get_gatherable_items", item_name)
         items = lookup.get("items", []) if isinstance(lookup, dict) else []
@@ -134,6 +143,9 @@ class GatherPanel(QWidget):
             return
         if self._steel_worker is not None:
             self._status_label.setText("가공 무한 루틴 실행 중에는 사용할 수 없습니다. 먼저 정지해주세요.")
+            return
+        if self._job_queue_panel is not None and self._job_queue_panel.is_running():
+            self._status_label.setText("JOB 대기열이 실행 중입니다. 완료 후 다시 시도해주세요.")
             return
 
         match = self._lookup_gatherable(item_name)
@@ -181,6 +193,9 @@ class GatherPanel(QWidget):
 
         if self._gather_worker is not None:
             self._status_label.setText("채집이 진행 중입니다. 완료 후 다시 시도해주세요.")
+            return
+        if self._job_queue_panel is not None and self._job_queue_panel.is_running():
+            self._status_label.setText("JOB 대기열이 실행 중입니다. 완료 후 다시 시도해주세요.")
             return
 
         self._set_busy(True)

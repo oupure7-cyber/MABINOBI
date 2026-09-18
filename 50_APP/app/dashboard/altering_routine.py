@@ -73,6 +73,7 @@ budget cap yet (00_SPEC calls for one) - every gather/alter call costs 5, uncapp
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 
 from PySide6.QtCore import QThread, Signal
@@ -207,7 +208,12 @@ class AlteringRoutineWorker(QThread):
     # the CLI itself.
     snapshot = Signal(dict)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, duration_seconds: int | None = None):
+        """duration_seconds: if set, the routine stops itself (gracefully, not a `blocked`
+        stop) once that many seconds have elapsed since run() started - this is what turns the
+        otherwise-infinite routine into a finite JOB (see job_queue.py's "가공무한 1시간").
+        Checked between discrete actions only (not mid-call), so the actual overshoot is at
+        most whatever single action was in flight - up to ~15min for one execute_gathering."""
         super().__init__(parent)
         self._stop_requested = False
         self._blocked_stop = False
@@ -215,13 +221,25 @@ class AlteringRoutineWorker(QThread):
         self._materials: dict[str, int] = {}
         self._queue_occupied: dict[str, int] = {}
         self._queue_completed: dict[str, int] = {}
+        self._duration_seconds = duration_seconds
+        self._start_time: float | None = None
 
     def request_stop(self) -> None:
         self._stop_requested = True
 
+    def _time_exceeded(self) -> bool:
+        if self._duration_seconds is None or self._start_time is None:
+            return False
+        return time.monotonic() - self._start_time >= self._duration_seconds
+
     def run(self) -> None:
-        self.status.emit("가공 무한 루틴 시작 (강철괴/목재+/옷감+/가죽+)")
+        self._start_time = time.monotonic()
+        duration_note = f" - {self._duration_seconds}초 후 자동 종료" if self._duration_seconds else ""
+        self.status.emit(f"가공 무한 루틴 시작 (강철괴/목재+/옷감+/가죽+){duration_note}")
         while not self._stop_requested:
+            if self._time_exceeded():
+                self.status.emit("⏱️ 설정된 시간이 지나 루틴을 자동 종료합니다")
+                break
             try:
                 swept = self._sweep_all_facilities()
             except Exception as exc:  # noqa: BLE001 - one bad response shouldn't kill the loop
@@ -397,6 +415,8 @@ class AlteringRoutineWorker(QThread):
     def _gather_until_worth_a_collection_trip(self) -> bool:
         gathered_any = False
         while not self._stop_requested:
+            if self._time_exceeded():
+                return gathered_any
             target = self._decide_gather(self._materials)
             if target is None:
                 return gathered_any
