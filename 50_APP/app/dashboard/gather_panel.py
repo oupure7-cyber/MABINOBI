@@ -20,7 +20,8 @@ from PySide6.QtWidgets import (
 )
 
 from ..cli_client import run_cli
-from .steel_routine import SteelRoutineWorker
+from .altering_routine import AlteringRoutineWorker
+from .routine_dashboard import RoutineDashboard
 from .widgets import classify_cli_result
 
 GATHER_TIMEOUT = 900  # execute_gathering can take several minutes for a full 100-item run
@@ -78,7 +79,8 @@ class GatherPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._gather_worker: CliCallWorker | None = None
-        self._steel_worker: SteelRoutineWorker | None = None
+        self._steel_worker: AlteringRoutineWorker | None = None
+        self._routine_dashboard: RoutineDashboard | None = None
         self._buttons: list[QPushButton] = []
 
         outer = QVBoxLayout(self)
@@ -88,12 +90,20 @@ class GatherPanel(QWidget):
         title.setStyleSheet("color: #aaa; font-size: 11px;")
         outer.addWidget(title)
 
-        self._steel_btn = QPushButton("🔁 강철괴 무한 시작")
+        self._steel_btn = QPushButton("🔁 가공 무한 시작 (강철괴/목재+/옷감+/가죽+)")
         self._steel_btn.setStyleSheet(
             "QPushButton { background-color: #3a2f1a; color: #f0c060; font-weight: 600; padding: 6px; }"
         )
         self._steel_btn.clicked.connect(self._toggle_steel_routine)
         outer.addWidget(self._steel_btn)
+
+        # Status readout lives right under the routine button - not buried below the gather
+        # grid - so it's always visible while the routine or a quick-gather click is running,
+        # instead of the character seeming to sit there idle with no explanation on screen.
+        self._status_label = QLabel("")
+        self._status_label.setWordWrap(True)
+        self._status_label.setStyleSheet("color: #ddd; font-size: 11px; padding: 2px 0;")
+        outer.addWidget(self._status_label)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -107,10 +117,6 @@ class GatherPanel(QWidget):
             self._buttons.append(btn)
         scroll.setWidget(grid_host)
         outer.addWidget(scroll, 1)
-
-        self._status_label = QLabel("")
-        self._status_label.setWordWrap(True)
-        outer.addWidget(self._status_label)
 
     def _lookup_gatherable(self, item_name: str) -> dict | None:
         lookup = run_cli("get_gatherable_items", item_name)
@@ -127,7 +133,7 @@ class GatherPanel(QWidget):
             self._status_label.setText("이미 채집이 진행 중입니다. 완료 후 다시 시도해주세요.")
             return
         if self._steel_worker is not None:
-            self._status_label.setText("강철괴 무한 루틴 실행 중에는 사용할 수 없습니다. 먼저 정지해주세요.")
+            self._status_label.setText("가공 무한 루틴 실행 중에는 사용할 수 없습니다. 먼저 정지해주세요.")
             return
 
         match = self._lookup_gatherable(item_name)
@@ -164,7 +170,7 @@ class GatherPanel(QWidget):
         for btn in self._buttons:
             btn.setEnabled(not busy)
 
-    # -- 강철괴 무한 routine ----------------------------------------------
+    # -- 가공 무한 routine (강철괴/목재+/옷감+/가죽+) ------------------------
 
     def _toggle_steel_routine(self) -> None:
         if self._steel_worker is not None:
@@ -178,24 +184,39 @@ class GatherPanel(QWidget):
             return
 
         self._set_busy(True)
-        self._steel_btn.setText("⏹ 강철괴 무한 정지")
-        self._status_label.setText("강철괴 무한 루틴 시작...")
+        self._steel_btn.setText("⏹ 가공 무한 정지")
+        self._status_label.setText("가공 무한 루틴 시작...")
 
-        worker = SteelRoutineWorker(self)
+        worker = AlteringRoutineWorker(self)
         worker.status.connect(self._on_steel_status)
         worker.blocked.connect(self._on_steel_blocked)
         worker.stopped.connect(self._on_steel_stopped)
         self._steel_worker = worker
+
+        # Standalone window, not a child dialog of the main 마비노비 window - the user drags it
+        # wherever's convenient while watching the game. It listens to the worker's `snapshot`
+        # signal only (never calls the CLI itself) and manages its own lifecycle from there:
+        # stays open with a red alert if the routine auto-stops (`blocked`), closes itself if
+        # the routine was stopped manually (this button) instead.
+        dashboard = RoutineDashboard(self.window())
+        dashboard.attach(worker)
+        dashboard.destroyed.connect(self._on_dashboard_destroyed)
+        self._routine_dashboard = dashboard
+        dashboard.show()
+
         worker.start()
 
     def _on_steel_status(self, text: str) -> None:
-        self._status_label.setText(f"[강철괴 무한] {text}")
+        self._status_label.setText(text)
 
     def _on_steel_blocked(self, kind: str) -> None:
-        self._status_label.setText(f"⚠️ [강철괴 무한] 게임에서 확인이 필요해 루틴을 멈췄습니다: {kind}")
+        self._status_label.setText(f"⚠️ 게임에서 확인이 필요해 가공 무한 루틴을 멈췄습니다: {kind}")
 
     def _on_steel_stopped(self) -> None:
         self._steel_worker = None
         self._steel_btn.setEnabled(True)
-        self._steel_btn.setText("🔁 강철괴 무한 시작")
+        self._steel_btn.setText("🔁 가공 무한 시작 (강철괴/목재+/옷감+/가죽+)")
         self._set_busy(False)
+
+    def _on_dashboard_destroyed(self, *_args) -> None:
+        self._routine_dashboard = None
