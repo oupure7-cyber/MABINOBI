@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-19 (GitHub Releases 기반 자동 업데이트 — exe가 알아서 최신 버전으로 갈아치움)
+
+- 사용자 요청: 배포한 `마비노비.exe`를 새 버전 낼 때마다 사용자들이 수동으로 재다운로드하지 않고, exe가 스스로 GitHub Release를 확인해서 조용히 업데이트하게 만들 것. 사용자(엔드유저)가 GitHub의 존재 자체를 모르게 — 팝업/URL 노출 없이.
+- **새 파일** `50_APP/app/version.py`: `APP_VERSION` 상수 하나. 배포할 때마다 여기 값을 올리고, 같은 버전으로 GitHub Release 태그를 붙이는 게 이후 배포 절차.
+- **새 파일** `50_APP/app/updater.py` (stdlib만 사용, PySide6/프로젝트 임포트 없음 — `launcher/launch_mabinobi.py`가 지키던 것과 같은 원칙, 매 실행마다 로드되는 코드라 가볍게 유지):
+  - `check_for_update(current_version)`: `https://api.github.com/repos/oupure7-cyber/MABINOBI/releases/latest`를 인증 없이(공개 저장소라 가능) 조회, 태그명(`vX.Y.Z`)을 현재 버전과 비교, draft/prerelease는 무시, `마비노비.exe`라는 이름의 첨부 자산(asset)이 있는 최신 release만 인정. 오프라인/미배포/파싱실패 등 어떤 이유로든 실패하면 예외 없이 그냥 `None` 반환(사용자에게 어떤 것도 보여주지 않음)
+  - `download_asset(url, dest)`: 새 exe를 현재 exe와 같은 폴더에 `마비노비.update.exe`로 다운로드(같은 드라이브에 둬야 나중에 원자적으로 이름 교체 가능)
+  - `apply_update_and_relaunch(new_exe, current_exe)`: 자기 자신이 실행 중인 exe 파일을 직접 못 바꾸므로, 숨겨진 PowerShell 헬퍼 스크립트를 분리 프로세스로 띄워서 "현재 PID 종료 대기 → 새 exe로 교체(`Move-Item`, 최대 10회 재시도) → 재실행 → 스크립트 자기 자신 삭제" 수행. cmd/.bat 대신 PowerShell을 쓴 이유: exe 파일명 자체가 한글(`마비노비.exe`)이라 cmd 배치파일의 코드페이지 처리가 이를 깨뜨림, PowerShell은 UTF-8(BOM) 스크립트를 있는 그대로 읽음
+- **새 파일** `50_APP/app/dashboard/update_worker.py`: `UpdateCheckWorker`(QThread) — 체크+다운로드를 백그라운드에서 수행, 성공 시에만 `update_ready` 시그널 발생(실패/최신 버전인 경우 아무 시그널도 없음 = UI에 아무 일도 없음)
+- `main_window.py`: `DashboardWindow` 생성 직후 `_start_update_check()` 호출 — 단, `sys.frozen`이 아니면(즉 `python main.py`로 개발 중 실행하는 경우) 완전히 스킵(교체할 "자기 exe"가 없으므로). 업데이트가 다운로드되면 곧바로 적용하지 않고 5초 간격 타이머로 `gather_panel.is_busy()`/`job_queue_panel.is_running()`을 확인해서 **가공 무한 루틴이나 JOB 대기열이 돌고 있지 않을 때까지 대기** → idle이 되면 작은 토스트("🔄 새 버전으로 업데이트합니다...")만 띄우고 2초 후 `apply_update_and_relaunch` 호출 + `QApplication.quit()`
+- 오프라인 테스트: `check_for_update`의 버전 비교/파싱/draft·prerelease 필터/자산명 매칭/네트워크 실패 케이스 전부 모킹으로 검증. 오프스크린 Qt 스모크 테스트로 dev 모드(비frozen)에서 업데이트 체크가 완전히 스킵되는지, JOB/가공무한 실행 중엔 적용이 미뤄지는지, idle이 되면 실제로 `apply_update_and_relaunch`가 호출되는지까지 확인
+- **배포 절차에 추가된 수동 단계** (매 버전마다): 1) `50_APP/app/version.py`의 `APP_VERSION` 올리기 → 2) exe 재빌드 → 3) GitHub 저장소에서 새 Release 생성, 태그를 `vX.Y.Z`(같은 버전)로, `마비노비.exe` 파일을 정확히 그 이름으로 자산 첨부 → 4) **Draft가 아닌 Publish 상태로 게시**(draft/prerelease는 무시되게 만들어둠). 실행 중인 구버전 사용자들은 다음 실행 시(또는 idle 상태가 되는 시점) 자동으로 이 Release를 받아 교체됨
+- **실측으로 발견/수정한 버그**: PyInstaller onefile은 Windows에서 실제로 프로세스 2개(부트로더+실제 앱, 부모/자식 관계)로 뜨고 둘 다 원본 exe 파일을 잡고 있음(`Get-CimInstance Win32_Process`로 실측 확인) — 처음엔 `os.getpid()`(자식 PID) 하나만 기다렸다가 고쳐서, "해당 exe 경로를 가진 프로세스가 하나도 없을 때까지" 기다리는 방식으로 변경. 격리 폴더에서 실제 exe 2개(현재판/새판)를 복사해두고 헬퍼를 직접 트리거해 교체+재실행까지 되는 것을 foreground 실행으로 실측 검증함
+- **한계/미검증 사항**: 헬퍼(PowerShell 스크립트)를 완전히 분리된(detached) 프로세스로 백그라운드에 띄운 뒤에도 앱이 완전히 종료된 후까지 그 헬퍼가 살아남아 작업을 끝마치는지는, 이 작업을 수행한 개발 환경(샌드박스형 도구) 자체가 자신이 띄운 백그라운드 프로세스를 도구 호출이 끝나면 회수해버리는 것으로 보여 안에서는 확실히 재현/검증하지 못함(`CREATE_BREAKAWAY_FROM_JOB` 플래그를 방어적으로 추가는 해둠) — foreground로 직접 실행했을 때는 스왑/재실행/자가삭제까지 전부 문제없이 동작하는 것을 확인함. 실제 배포 후 첫 업데이트가 사용자 PC(이 샌드박스 밖의 일반 Windows 세션)에서도 정말 끝까지 완주하는지는 실사용자 환경에서 한 번 실측 확인이 필요함
+- 문법 검사(`py_compile`) 통과
+
 ## 2026-09-19 (진짜 단일 파일 exe로 전환 — 얇은 런처 방식 폐기, launcher/ 삭제)
 
 - 사용자 요청: "내가 원했던건 py 파일들 뭐시기들 다 필요없고 exe 있으면 다 동작하게 만드는것이긴해" — 바로 아래 항목("배포용 런처 강화")의 `launcher/launch_mabinobi.py` 방식은 exe가 여전히 시스템 Python을 찾아 `50_APP/main.py`를 대신 실행해주는 "얇은 런처"일 뿐이라, exe 옆에 프로젝트 폴더 전체가 있어야 동작했음 — 이 방식 자체를 폐기하고 `50_APP/main.py`를 PyInstaller로 직접 빌드하는 진짜 단일 파일(onefile) 번들로 전환

@@ -17,6 +17,7 @@ python -m PyInstaller --onefile --noconsole --name "마비노비" --distpath .. 
 ## 구성
 
 - `main.py` — 진입점. 바로 대시보드로 진입 (설치 마법사는 자동으로 뜨지 않음, 버튼으로만 열림).
+- `app/version.py` / `app/updater.py` / `app/dashboard/update_worker.py` — 자동 업데이트(2026-09-19). exe로 빌드된 경우(`sys.frozen`)에만 동작 — 시작 시 백그라운드로 GitHub Releases 최신 태그를 조회해 `app/version.py`의 `APP_VERSION`보다 높으면 조용히 다운로드해뒀다가, 가공 무한/JOB 대기열이 idle일 때 exe 자신을 교체하고 재시작함. GitHub 관련 UI/URL은 사용자에게 전혀 노출되지 않음. 새 버전 배포 절차: `APP_VERSION` 올리기 → exe 재빌드 → GitHub에 `vX.Y.Z` 태그로 Release 생성, `마비노비.exe` 이름 그대로 자산 첨부, Publish.
 - `app/cli_client.py` — `MabinogiMobile_CLI.exe` 서브프로세스 호출 래퍼 (`MABINOGI_CLI_PATH` 환경변수로 경로 변경 가능, 기본값은 `30_MCP_SERVER/server.py`와 동일).
 - `app/app_settings.py` — `QSettings` 기반 앱 상태(온보딩 완료 여부. 현재는 마법사가 수동 호출로만 열려 직접적인 게이팅 용도로는 안 쓰임).
 - `app/onboarding/` — 설치 마법사(`wizard.py`)와 환경 감지 로직(`checks.py`). [40_ONBOARDING/01_사용자_설치_가이드.md](../40_ONBOARDING/01_사용자_설치_가이드.md)의 6단계를 화면으로 구현. 대시보드 우상단 "설치 마법사" 버튼으로 열림.

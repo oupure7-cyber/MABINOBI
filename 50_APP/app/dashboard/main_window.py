@@ -7,10 +7,12 @@ yet - this is the "see what's going on" half of the control app.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
+    QApplication,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -23,13 +25,19 @@ from PySide6.QtWidgets import (
 
 from ..cli_client import run_cli
 from ..onboarding.wizard import OnboardingWizard
+from ..updater import apply_update_and_relaunch
+from ..version import APP_VERSION
 from .connection import ConnectionCheckWorker
 from .connector_guide import ConnectorGuideDialog
 from .gather_panel import GatherPanel
 from .guide_viewer import GuideDialog
 from .job_queue import JobQueuePanel
 from .music_panel import MusicPanel
+from .update_worker import UpdateCheckWorker
 from .widgets import CurrencyColumn, Toast, ToggleSwitch
+
+# How often to recheck whether it's safe (nothing running) to apply a downloaded update.
+UPDATE_APPLY_RECHECK_MS = 5000
 
 # get_my_info field -> grid position (row, col), 4 columns x 3 rows, user-picked subset
 # (see get_my_info in 10_RESEARCH/03_cli_command_reference_2026-09-17.md for the full field list)
@@ -132,6 +140,11 @@ class DashboardWindow(QMainWindow):
         self._connection_worker: ConnectionCheckWorker | None = None
         self._guide_dialog: ConnectorGuideDialog | None = None
 
+        self._update_worker: UpdateCheckWorker | None = None
+        self._pending_update_exe: Path | None = None
+        self._pending_update_version: str | None = None
+        self._update_apply_timer: QTimer | None = None
+
         central = QWidget()
         outer = QVBoxLayout(central)
 
@@ -142,6 +155,7 @@ class DashboardWindow(QMainWindow):
         self.toast = Toast(self)
 
         self._try_connect()
+        self._start_update_check()
 
     # -- layout builders --------------------------------------------------
 
@@ -232,3 +246,36 @@ class DashboardWindow(QMainWindow):
         self.top_stats.set_data(run_cli("get_my_info"))
         self.currency_column.set_data(run_cli("get_currencies"))
         self.music_panel.refresh_songs()
+
+    # -- silent self-update (GitHub Releases, 2026-09-19) ---------------------------
+
+    def _start_update_check(self) -> None:
+        # Only the built exe can replace itself this way; a `python main.py` dev run has
+        # no "own exe" to swap, and would just overwrite whatever .py-launching wrapper
+        # happens to be at sys.executable (python.exe itself) - skip entirely.
+        if not getattr(sys, "frozen", False):
+            return
+        self._update_worker = UpdateCheckWorker(Path(sys.executable), APP_VERSION)
+        self._update_worker.update_ready.connect(self._on_update_ready)
+        self._update_worker.start()
+
+    def _on_update_ready(self, new_exe_path: str, version: str) -> None:
+        self._pending_update_exe = Path(new_exe_path)
+        self._pending_update_version = version
+        self._update_apply_timer = QTimer(self)
+        self._update_apply_timer.setInterval(UPDATE_APPLY_RECHECK_MS)
+        self._update_apply_timer.timeout.connect(self._maybe_apply_update)
+        self._update_apply_timer.start()
+
+    def _maybe_apply_update(self) -> None:
+        # Never interrupt a running 가공 무한 routine or JOB 대기열 - wait until both are
+        # idle before swapping the exe out from under the user.
+        if self.gather_panel.is_busy() or self.job_queue_panel.is_running():
+            return
+        self._update_apply_timer.stop()
+        self.toast.show_message(f"🔄 새 버전({self._pending_update_version})으로 업데이트합니다...", 2500)
+        QTimer.singleShot(2000, self._apply_update_now)
+
+    def _apply_update_now(self) -> None:
+        apply_update_and_relaunch(self._pending_update_exe, Path(sys.executable))
+        QApplication.instance().quit()
