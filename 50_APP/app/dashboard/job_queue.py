@@ -138,6 +138,17 @@ JOB_CATALOG.extend(
 )
 JOB_CATALOG_BY_KEY: dict[str, JobSpec] = {spec.key: spec for spec in JOB_CATALOG}
 
+# Hidden x10 equipment variants (5 weeks' worth of scrolls in one job) - deliberately
+# NOT added to JOB_CATALOG, so they never show up in the searchable catalog list. Only
+# reachable via the "주간 제작(마을) x5" buttons (modern_window.py), which exist
+# specifically to batch 5 weeks into as few execute_crafting calls as the facility
+# allows instead of running the x2 job 5 times over (user request, 2026-09-20).
+EQUIPMENT_WEEKLY_X10: dict[str, JobSpec] = {
+    recipe: JobSpec(key=f'equipment_x10_{recipe}', name=f'제작: {recipe} x10',
+                     make_worker=lambda r=recipe: EquipmentCraftWorker(r, count=10))
+    for recipe in EQUIPMENT_RECIPES
+}
+
 
 @dataclass
 class QueuedJob:

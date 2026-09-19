@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
 
 from .main_window import DashboardWindow as LegacyWindow, TopStatsPanel
 from .widgets import CurrencyColumn, Toast, ToggleSwitch, HIDDEN_CURRENCY_NAMES, classify_cli_result
-from .job_queue import JOB_CATALOG, JobSpec, QueuedJob
+from .job_queue import JOB_CATALOG, JobSpec, QueuedJob, EQUIPMENT_WEEKLY_X10
+from .equipment_crafting import TOWN_EQUIPMENT
 from .altering_routine import AlteringRoutineWorker
 from .routine_dashboard import RoutineDashboard
 from .music_panel import MusicPanel
@@ -328,6 +329,18 @@ class DashboardWindow(LegacyWindow):
             b = button(name, lambda _, n=name: self.select_category(n)); b.setCheckable(True); b.setChecked(name == self.category)
             group.addButton(b); cats.addWidget(b)
         cats.addStretch(); lv.addLayout(cats)
+        self.equipment_buttons = QWidget(); eqv = QVBoxLayout(self.equipment_buttons)
+        eqv.setContentsMargins(0, 0, 0, 6); eqv.setSpacing(6)
+        eqv.addWidget(button('보유 스크롤 모두 진행', self.craft_all_owned_scrolls))
+        weekly = QHBoxLayout()
+        for town in TOWN_EQUIPMENT:
+            weekly.addWidget(button(f'주간 제작({town})', lambda _, t=town: self.add_weekly_equipment(t, 1)))
+        eqv.addLayout(weekly)
+        weekly_x5 = QHBoxLayout()
+        for town in TOWN_EQUIPMENT:
+            weekly_x5.addWidget(button(f'주간 제작({town}) x5', lambda _, t=town: self.add_weekly_equipment(t, 5)))
+        eqv.addLayout(weekly_x5)
+        lv.addWidget(self.equipment_buttons); self.equipment_buttons.hide()
         search = QHBoxLayout(); self.search = QLineEdit(); self.search.setPlaceholderText('재료 또는 작업 이름 검색')
         self.search.textChanged.connect(self.render_catalog); search.addWidget(self.search, 1)
         filters = QButtonGroup(self)
@@ -409,6 +422,7 @@ class DashboardWindow(LegacyWindow):
             self.catalog.setItem(i, 1, QTableWidgetItem('  ' + quantity(spec) + '  '))
         self.empty.setText('검색 결과가 없습니다.' if not specs else '')
         self.empty.setVisible(not specs)
+        self.equipment_buttons.setVisible(self.category == '제작')
         self.routine.setVisible(self.category == '무한가공소')
         self.catalog.setMaximumHeight(125 if self.category == '무한가공소' else 16777215)
 
@@ -421,6 +435,22 @@ class DashboardWindow(LegacyWindow):
         self.recent = [spec.key] + [k for k in self.recent if k != spec.key]
         self.settings.setValue('recent', self.recent[:30])
         self.toast.show_message(f'대기열에 추가됨 · {title(spec)}')
+
+    def add_weekly_equipment(self, town, weeks):
+        """'주간 제작(마을)'/'x5' buttons - queue that town's 3 scroll recipes at once.
+        x5 uses the hidden x10 job (5 weeks' worth batched into as few execute_crafting
+        calls as the facility allows) instead of adding the x2 job with repeats=5, which
+        would re-run the whole x2 job 5 separate times (user request, 2026-09-20)."""
+        for recipe in TOWN_EQUIPMENT[town]:
+            if weeks == 5:
+                spec = EQUIPMENT_WEEKLY_X10[recipe]
+            else:
+                spec = next(s for s in self.specs if s.key == f'equipment_{recipe}')
+            self.add_job(spec)
+
+    def craft_all_owned_scrolls(self):
+        # TODO: 사용자가 나중에 동작을 지정하기로 함 (2026-09-20) - 지금은 자리만 마련.
+        self.toast.show_message('아직 준비 중인 기능입니다.')
 
     def make_info_panel(self):
         self.info = QFrame(self.centralWidget()); self.info.setObjectName('infoPanel')

@@ -10,7 +10,8 @@
 - 왼쪽에서 작업을 추가하고 오른쪽 통합 대기열에서 시작, 횟수 변경, 순서 이동, 삭제를 합니다. 작업 추가만으로 실행되지 않습니다.
 - 전체 일시정지는 이미 요청한 채집·요리 작업이 끝난 후 적용됩니다. 실행 중인 작업은 직접 수정할 수 없으며, 건너뛰기 역시 현재 요청 종료 후 적용됩니다.
 - 무한가공소는 기존 가공 워커를 사용하며, 무한 실행과 기존 1시간 실행을 제공합니다. 직접 건너뛰어야 무한 작업 뒤의 작업이 실행됩니다. 가공 현황은 해당 탭 안에서 표시됩니다.
-- 요리는 야채볶음과 추가 요리 9종(각 10개/50개), 제작은 장비 12종(각 2개)을 제공합니다. 새 작업은 게임 레시피를 조회하며 부족한 채집·제작 재료를 준비합니다. 별도 가공·구매 재료나 해금 조건이 부족하면 멈춥니다. 새 레시피는 1회씩 제작하므로 호출마다 정령의 날개가 소모됩니다. 게임이 꺼져 있어 새 요리·장비의 실제 게임 제작은 아직 검증하지 못했습니다.
+- 요리는 야채볶음과 추가 요리 9종(각 10개/50개), 제작은 장비 12종(각 2개)을 제공합니다. 새 작업은 게임 레시피를 조회하며 부족한 채집·제작 재료를 준비합니다. 별도 가공·구매 재료나 해금 조건이 부족하면 멈춥니다. 목표 수량은 시설이 허용하는 한 한 번의 `execute_crafting` 호출에 몰아서 요청합니다(2026-09-20~ — `execute_crafting`은 `craftCount`와 무관하게 호출마다 정령의 날개를 소모하므로, 여러 번 나눠 부르면 그만큼 낭비). 게임이 꺼져 있어 새 요리·장비의 실제 게임 제작은 아직 검증하지 못했습니다.
+- **제작 탭 전용 버튼**(2026-09-20): 검색창 위에 "보유 스크롤 모두 진행"(추후 구현 예정, 지금은 자리만) / 마을별 "주간 제작(마을명)" 4개(그 마을 임무 게시판이 파는 장비 3종을 x2로 대기열에 추가) / "주간 제작(마을명) x5" 4개(같은 3종을 5주치(x10)로, 목록엔 없는 숨은 JOB으로 한 번에 추가 — `job_queue.py`의 `EQUIPMENT_WEEKLY_X10`, x2 JOB을 5번 반복하는 것보다 `execute_crafting` 호출 수가 적음).
 - 악보는 별도 창 대신 상위 탭에서 이용합니다. 악기는 제목 아래에서 선택합니다. 작업 실행 중에는 연주 시작을 막으며, 작업 일시정지와 현재 요청 완료 후 연주할 수 있습니다.
 - 캐릭터 정보 버튼은 능력치와 재화 패널을 펼칩니다. 주요 재화는 빠른 조회 메뉴입니다. 기존 재화 아이콘 파일과 manifest 매핑은 변경하지 않았습니다.
 - 즐겨찾기와 추가 버튼을 제거하고 목록에서 대기열로 드래그하여 추가합니다. 최근 사용은 이 PC에 저장됩니다. 작업 대기열은 앱을 닫으면 유지되지 않습니다.
@@ -49,14 +50,14 @@ python -m PyInstaller --noconfirm --distpath .. mabinobi.spec
 - `app/dashboard/` — 메인 화면. 레이아웃: 상단 컨트롤 바(스탯 4x3 + 게임 연결 토글/캐릭터 관리) → 본문 좌측 재화 컬럼 + 중앙(상: 가공 무한 토글, 하: 음악 플레이어) + 우측 JOB 대기열 컬럼.
   - `main_window.py` — 메뉴바 없음. 앱 실행 시 `connection.py`(백그라운드 스레드)로 게임 연결 자동 시도, 실패 시 `connector_guide.py` 비모달 팝업(게임 내 AI 커넥터 활성화 안내 + 스크린샷 2장). `TopStatsPanel`(전투력/생활력/매력/마도저항/공격력/최대체력/방어력/데코점수/힘/솜씨/지력/행운, 4x3 고정 그리드)이 컨트롤 바 왼쪽에 있음. 중앙은 `QSplitter(Vertical)`로 `GatherPanel`/`MusicPanel` 분할, 오른쪽엔 고정폭 `JobQueuePanel`.
   - `modern_window.py` — 위 "통합 작업 UI" 절에서 설명한 새 진입 화면. `main_window.py`의 `DashboardWindow`를 `LegacyWindow`로 확장해 기존 CLI 워커/재화 에셋을 그대로 재사용하면서 작업/악보 통합 탭 레이아웃을 새로 구성.
-  - `equipment_crafting.py` / `recipe_cooking.py` — 요리·장비 제작 JOB(부족 재료 채집 → 제작, 1회 제작 상한 자동 분할).
+  - `equipment_crafting.py` / `recipe_cooking.py` — 요리·장비 제작 JOB(부족 재료 채집 → 제작). `recipe_cooking.py`의 `craft_batch()`(2026-09-20)가 목표 수량을 `craftCount`로 한 번에 몰아서 요청 — `execute_crafting` 호출은 `craftCount`와 무관하게 매번 정령의 날개를 소모하므로, N개를 1개씩 N번 나눠 부르는 대신 시설이 허용하는 한 최대한 한 번에(시설별 상한은 `invalid_count`+`maxCount` 응답으로 실측 학습, `food_crafting_job.py`와 동일 방식) 요청해 낭비를 줄임. `equipment_crafting.py`의 `TOWN_EQUIPMENT`: 마을(임무 게시판 NPC)별로 파는 "제작 스크롤: `<이름>`"이 매핑하는 장비 3종 — 스크롤 하나당 장비 2개가 목표라 제작 JOB 기본 수량이 2개.
   - `item_icons.py` — 모비라이프에서 이름이 일치하는 아이템 아이콘만 캐시(`assets/item_icons/manifest.json`).
   - `job_drag.py` — 통합 작업 UI의 카탈로그→대기열 드래그앤드롭 위젯.
   - `widgets.py` — `ToggleSwitch`, `Toast`, `CurrencyColumn`(왼쪽 세로 스크롤 재화 목록, 일부 항목 숨김/이름 축약 규칙 포함), `classify_cli_result()`(CLI 응답 성공/실패 공용 판정 — 여러 패널이 재사용).
   - `gather_panel.py` — "🔁 가공 무한 시작" 토글 버튼(`altering_routine.py` 실행/정지) + 상태 라벨만 남음. 예전엔 채집 바로가기 버튼 25개도 있었지만 2026-09-18에 JOB 대기열로 이전하면서 제거됨.
   - `altering_routine.py` — "가공 무한" 루틴 본체(`AlteringRoutineWorker`, QThread). 강철괴/목재+/옷감+/가죽+ 4개 가공 체인을 라운드로빈으로 순회하며 시설별로 회수→그리디하게 최대한 채우기, 원자재는 7작업분의 5배를 목표로 선제 채집. `duration_seconds` 옵션으로 유한 시간 후 자동 종료 가능(JOB 대기열의 "가공무한 1시간"이 이걸 사용). `blocked` 응답을 만나면 자동 우회 없이 즉시 정지.
   - `routine_dashboard.py` — "가공 무한" 실행 중 뜨는 독립 창. 재료/생산물 전량과 시설별 대기열(n/7, 완료 개수 강조) 표시. CLI를 직접 호출하지 않고 워커의 `snapshot` 시그널만 구독.
-  - `job_queue.py` — 화면 우측 JOB 대기열(`JobQueuePanel`). 유한한 자동화 작업(JOB)을 순서대로 반복 실행(`◀ N ▶` 1~9회), 휴지통으로 삭제(실행 중인 JOB이면 중단 후 다음 진행), `blocked` 시 전체 일시정지+재개. 하단에 검색 가능한 JOB 카탈로그(`JOB_CATALOG`): "가공무한 1시간", "야채볶음10개"/"야채볶음 50개"(`food_crafting_job.py`), "채집: `<이름>` x100" 25종(`gather_job.py`, 예전 채집 바로가기 버튼을 대체), 요리/장비 제작 JOB(`recipe_cooking.py`/`equipment_crafting.py`).
+  - `job_queue.py` — 화면 우측 JOB 대기열(`JobQueuePanel`). 유한한 자동화 작업(JOB)을 순서대로 반복 실행(`◀ N ▶` 1~9회), 휴지통으로 삭제(실행 중인 JOB이면 중단 후 다음 진행), `blocked` 시 전체 일시정지+재개. 하단에 검색 가능한 JOB 카탈로그(`JOB_CATALOG`): "가공무한 1시간", "야채볶음10개"/"야채볶음 50개"(`food_crafting_job.py`), "채집: `<이름>` x100" 25종(`gather_job.py`, 예전 채집 바로가기 버튼을 대체), 요리/장비 제작 JOB(`recipe_cooking.py`/`equipment_crafting.py`). `EQUIPMENT_WEEKLY_X10`: 장비 x10 버전 — `JOB_CATALOG`에는 안 넣어서 검색 목록엔 안 뜨고, 제작 탭의 "주간 제작(마을) x5" 버튼에서만 사용.
   - `food_crafting_job.py` — 재료 채집→`execute_crafting` 1회성 JOB 타입(`FoodCraftWorker`). 부족한 재료만 채집 후 목표 개수 제작, 시설의 1회 제작 상한(`invalid_count`+`maxCount`)에 걸리면 자동 분할.
   - `gather_job.py` — 채집 한 번짜리 1회성 JOB 타입(`GatherJobWorker`) + `GATHER_ITEMS`(예전 버튼 목록, 25종).
   - `music_panel.py` — 스포티파이류 플레이어. 좌: 검색창 + 보유 악보 카탈로그(`get_music_scores`, 드래그 소스). 우: 현재 재생 곡 + 재생 대기열(드래그로 순서 변경/카탈로그에서 끼워넣기/휴지통으로 삭제) + 하단 `InstrumentBar`(보유 악기 버튼, 클릭 시 `change_instrument`). 대기열은 게임에 없는 개념이라 `get_activity`의 `Performance.IsPlaying`을 4초 간격 폴링해서 곡이 끝나면 자동으로 다음 곡 재생.
