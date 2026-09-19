@@ -20,3 +20,6 @@ Thumbs.db
 build/
 dist/
 *.spec
+!50_APP/mabinobi.spec
+# Local rollback copies; only the main executable is distributed.
+/마비노비.*.exe

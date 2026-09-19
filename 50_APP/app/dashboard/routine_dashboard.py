@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from .altering_routine import CHAINS, QUEUE_CAPACITY, AlteringRoutineWorker
+from .item_icons import item_icon
 
 
 def _ordered_material_names() -> list[str]:
@@ -79,7 +80,7 @@ class RoutineDashboard(QWidget):
         table.setSelectionMode(QTableWidget.NoSelection)
         table.horizontalHeader().setStretchLastSection(True)
         for row, name in enumerate(self._material_names):
-            table.setItem(row, 0, QTableWidgetItem(name))
+            table.setItem(row, 0, QTableWidgetItem(item_icon(name), name))
             count_item = QTableWidgetItem("-")
             table.setItem(row, 1, count_item)
             self._material_row[name] = row
