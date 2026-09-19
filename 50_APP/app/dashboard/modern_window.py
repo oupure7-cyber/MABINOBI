@@ -32,7 +32,7 @@ def title(spec):
     return spec.name.replace('채집: ', '').replace('요리: ', '').replace('제작: ', '').replace(' x100', '')
 
 def quantity(spec, repeats=1):
-    if kind(spec) == '제작': return f'목표 {3 * repeats:,}개'
+    if kind(spec) == '제작': return f'목표 {2 * repeats:,}개'
     if kind(spec) == '채집':
         return f'최대 {100 * repeats:,}개'
     if kind(spec) == '요리':
@@ -396,7 +396,7 @@ class DashboardWindow(LegacyWindow):
         self.catalog_note.setText('새 요리는 목표 수량 이상을 1회씩 제작합니다. 제작 호출마다 정령의 날개 5개가 소모되며, 별도 준비가 필요한 재료는 안내 후 멈춥니다.' if self.category == '요리' else '아이템을 오른쪽 대기열로 드래그한 뒤 시작하세요.')
         needle = self.search.text().strip().lower()
         if self.category == '제작':
-            self.catalog_note.setText('한 작업당 장비 3개 제작 · 오른쪽 대기열로 드래그하세요. 제작 1회마다 정령의 날개 5개 소모. 별도 가공·구매 재료가 부족하면 안내 후 멈춥니다.')
+            self.catalog_note.setText('한 작업당 장비 2개 제작 · 오른쪽 대기열로 드래그하세요. 제작 1회마다 정령의 날개 5개 소모. 별도 가공·구매 재료가 부족하면 안내 후 멈춥니다.')
         specs = [s for s in self.specs if kind(s) == self.category and needle in s.name.lower()]
         if self.filter_mode == '최근 사용': specs = sorted([s for s in specs if s.key in self.recent], key=lambda s: self.recent.index(s.key))
         self.catalog.setRowCount(len(specs))

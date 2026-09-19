@@ -10,7 +10,7 @@ EQUIPMENT_RECIPES = (
 
 class EquipmentCraftWorker(RecipeCookingWorker):
     def __init__(self, recipe):
-        super().__init__(recipe, 3)
+        super().__init__(recipe, 2)
 
     def recipe_info(self, name):
         recipe = super().recipe_info(name)

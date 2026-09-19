@@ -132,7 +132,7 @@ JOB_CATALOG.extend(
     for recipe in RECIPES for count in (10, 50)
 )
 JOB_CATALOG.extend(
-    JobSpec(key=f'equipment_{recipe}', name=f'제작: {recipe} x3',
+    JobSpec(key=f'equipment_{recipe}', name=f'제작: {recipe} x2',
             make_worker=lambda r=recipe: EquipmentCraftWorker(r))
     for recipe in EQUIPMENT_RECIPES
 )

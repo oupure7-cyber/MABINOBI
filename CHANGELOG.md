@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-20 (제작 JOB 목표 수량 3개 → 2개로 축소)
+
+- 사용자 요청으로 장비 제작 12종의 1회 목표 수량을 3개에서 2개로 축소: `equipment_crafting.py`(`EquipmentCraftWorker` 목표값), `job_queue.py`(카탈로그 표시 이름 `x3`→`x2`), `modern_window.py`(목표 수량 계산식 및 제작 탭 안내 문구), 루트 `README.md`("장비 12종(각 3개)" → "각 2개")까지 전부 일괄 수정
+- 관련 테스트(`test_equipment.py`) 6개 값/이름 갱신 — 전체 테스트 66개 재확인 통과
+
 ## 2026-09-19 (세 번째 릴리즈: GitHub Release v0.9.2 게시 — 캐릭터 전환 감지/관리/창고 검색/CLI 경로 자동 감지 반영)
 
 - `APP_VERSION`을 `0.9.2`로 올리고 exe 재빌드, 유닛 테스트 66개 + `--ui-self-test`(탭에 새 "창고" 포함 확인) 통과 후 GitHub Release `v0.9.2` 게시(자산명 `MabiNobi.exe`, ASCII)
