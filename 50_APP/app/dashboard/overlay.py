@@ -25,7 +25,7 @@ from PySide6.QtCore import QObject, QRect, Qt, QTimer
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from ..cli_client import try_run_cli
-from .altering_routine import CHAINS
+from .altering_routine import FAMILIES
 
 GAME_WINDOW_TITLE = "마비노기 모바일"
 TRACK_INTERVAL_MS = 500  # position sync + data refresh cadence (user-specified)
@@ -126,11 +126,11 @@ class FacilityOverlay(OverlayWindow):
         v.setContentsMargins(8, 7, 8, 7)
         v.setSpacing(3)
         self._rows: dict[str, tuple[str, QLabel]] = {}
-        for chain in CHAINS:
-            short = chain.facility.replace(" 가공 시설", "")
+        for family in FAMILIES:
+            short = family.facility.replace(" 가공 시설", "")
             label = QLabel(f"{FACILITY_EMOJI.get(short, '🔧')} {short} ▱▱▱▱▱▱▱ -/7")
             v.addWidget(label)
-            self._rows[chain.facility] = (short, label)
+            self._rows[family.facility] = (short, label)
 
     @staticmethod
     def _bar(occupied: int, done: int, total: int = 7) -> str:

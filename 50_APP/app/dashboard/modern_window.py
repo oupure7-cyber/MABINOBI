@@ -208,6 +208,7 @@ class WorkQueue(QWidget):
             self.snapshot_target._alert.hide(); self.snapshot_target._content.show()
             self.worker.snapshot.connect(self.snapshot_target._on_snapshot)
             self.worker.blocked.connect(self.snapshot_target._on_blocked)
+            self.snapshot_target.wire_targets(self.worker)
         self.render(); self.worker.start()
 
     def on_blocked(self, reason):

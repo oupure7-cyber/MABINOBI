@@ -1,16 +1,22 @@
-"""Standalone floating window that mirrors AlteringRoutineWorker's state while it runs - a
-materials table (전체 자원 리스트, inventory+account+character storage summed - same numbers
-the worker itself decides on) and a per-facility queue fill bar (n/7), both driven purely by
-the worker's `snapshot` signal (see altering_routine.py's module docstring: this window never
-calls the CLI itself, to avoid two callers hitting MabinogiMobile_CLI.exe at once).
+"""Standalone floating window that mirrors AlteringRoutineWorker's state while it runs - the
+per-family target-tier sliders (`TierTargetControl`, what actually drives the routine's runtime
+behavior - see altering_routine.py's module docstring for the promotion rule) and a
+per-facility queue fill bar (n/7), the latter driven purely by the worker's `snapshot` signal
+(this window never calls the CLI itself, to avoid two callers hitting MabinogiMobile_CLI.exe at
+once).
+
+The old "재료/생산물 현황" materials table that used to live here was removed 2026-09-20 in
+favor of the sliders - user request, once the routine became a runtime-adjustable N-tier
+chain instead of a fixed 2-tier one, the thing worth surfacing here is "how far should this go"
+rather than a raw inventory dump.
 
 Lifecycle (user-specified, 2026-09-18):
 - Opens automatically alongside the routine (gather_panel.py creates+shows it when the
   routine starts) as a separate top-level window from the main 마비노비 window, so it can be
   dragged to wherever's convenient while watching the game.
 - If the routine auto-stops itself (`blocked` - e.g. an unexpected popup), the window stays
-  open but swaps its content for a red "루틴이 중단되었습니다" alert - the per-item counts
-  disappear, since they're no longer being updated and would just be stale.
+  open but swaps its content for a red "루틴이 중단되었습니다" alert - the queue bars stop
+  updating, since they're no longer live and would just be stale.
 - If the user manually stops the routine (the button in the main window), this window closes
   itself entirely instead.
 """
@@ -18,32 +24,10 @@ Lifecycle (user-specified, 2026-09-18):
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QGroupBox,
-    QLabel,
-    QProgressBar,
-    QTableWidget,
-    QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QGroupBox, QLabel, QProgressBar, QVBoxLayout, QWidget
 
-from .altering_routine import CHAINS, QUEUE_CAPACITY, AlteringRoutineWorker
-from .item_icons import item_icon
-
-
-def _ordered_material_names() -> list[str]:
-    """Display order grouped by chain (완제품, 중간재, 직접재료, 원자재), de-duplicated - not
-    alphabetical, so related rows sit together (e.g. 옷감/옷감+/양털 stay adjacent even though
-    양털 also feeds the 옷감 intermediate)."""
-    names: list[str] = []
-    seen: set[str] = set()
-    for chain in CHAINS:
-        for name in (chain.end_product, chain.intermediate, chain.end_direct_material, *[p.raw_material for p in chain.paths]):
-            if name not in seen:
-                seen.add(name)
-                names.append(name)
-    return names
+from .altering_routine import FAMILIES, QUEUE_CAPACITY, AlteringRoutineWorker
+from .tier_target_control import TierTargetControl
 
 
 class RoutineDashboard(QWidget):
@@ -54,10 +38,10 @@ class RoutineDashboard(QWidget):
         self.resize(320, 480)
 
         self._blocked = False
-        self._material_names = _ordered_material_names()
-        self._material_row: dict[str, int] = {}
         self._queue_bar: dict[str, QProgressBar] = {}
         self._queue_label: dict[str, QLabel] = {}
+        self._controls: dict[str, TierTargetControl] = {}
+        self._target_worker: AlteringRoutineWorker | None = None
 
         outer = QVBoxLayout(self)
 
@@ -71,34 +55,26 @@ class RoutineDashboard(QWidget):
         content_layout = QVBoxLayout(self._content)
         content_layout.setContentsMargins(0, 0, 0, 0)
 
-        materials_box = QGroupBox("재료/생산물 현황 (인벤토리+캐릭터창고+계정창고 합계)")
-        materials_layout = QVBoxLayout(materials_box)
-        table = QTableWidget(len(self._material_names), 2)
-        table.setHorizontalHeaderLabels(["이름", "수량"])
-        table.verticalHeader().setVisible(False)
-        table.setEditTriggers(QTableWidget.NoEditTriggers)
-        table.setSelectionMode(QTableWidget.NoSelection)
-        table.horizontalHeader().setStretchLastSection(True)
-        for row, name in enumerate(self._material_names):
-            table.setItem(row, 0, QTableWidgetItem(item_icon(name), name))
-            count_item = QTableWidgetItem("-")
-            table.setItem(row, 1, count_item)
-            self._material_row[name] = row
-        self._table = table
-        materials_layout.addWidget(table)
-        content_layout.addWidget(materials_box, 1)
+        targets_box = QGroupBox("목표 등급 설정")
+        targets_layout = QVBoxLayout(targets_box)
+        for family in FAMILIES:
+            control = TierTargetControl(family)
+            control.target_changed.connect(self._on_target_changed(family.key))
+            targets_layout.addWidget(control)
+            self._controls[family.key] = control
+        content_layout.addWidget(targets_box, 1)
 
         queue_box = QGroupBox("가공 시설 대기열")
         queue_layout = QVBoxLayout(queue_box)
-        for chain in CHAINS:
-            label = QLabel(f"{chain.label} ({chain.facility}): -/{QUEUE_CAPACITY}")
+        for family in FAMILIES:
+            label = QLabel(f"{family.label} ({family.facility}): -/{QUEUE_CAPACITY}")
             bar = QProgressBar()
             bar.setRange(0, QUEUE_CAPACITY)
             bar.setTextVisible(False)
             queue_layout.addWidget(label)
             queue_layout.addWidget(bar)
-            self._queue_label[chain.key] = label
-            self._queue_bar[chain.key] = bar
+            self._queue_label[family.key] = label
+            self._queue_bar[family.key] = bar
         content_layout.addWidget(queue_box)
 
         outer.addWidget(self._content, 1)
@@ -107,14 +83,26 @@ class RoutineDashboard(QWidget):
         worker.snapshot.connect(self._on_snapshot)
         worker.blocked.connect(self._on_blocked)
         worker.stopped.connect(self._on_stopped)
+        self.wire_targets(worker)
+
+    def wire_targets(self, worker: AlteringRoutineWorker) -> None:
+        """Point the sliders at `worker` - safe to call again for a new worker instance (e.g.
+        every time the "가공무한 1시간" JOB restarts against the long-lived embedded dashboard
+        in modern_window.py): pushes the sliders' current values into it once immediately, and
+        re-targets future drags there instead of whatever worker was previously wired."""
+        self._target_worker = worker
+        for family_key, control in self._controls.items():
+            worker.set_target(family_key, control.value())
+
+    def _on_target_changed(self, family_key: str):
+        def handler(idx: int) -> None:
+            if self._target_worker is not None:
+                self._target_worker.set_target(family_key, idx)
+        return handler
 
     def _on_snapshot(self, snap: dict) -> None:
         if self._blocked:
             return
-        materials = snap.get("materials", {})
-        for name, row in self._material_row.items():
-            if name in materials:
-                self._table.item(row, 1).setText(str(materials[name]))
         queue = snap.get("queue", {})
         queue_completed = snap.get("queue_completed", {})
         for key, n in queue.items():
@@ -124,8 +112,8 @@ class RoutineDashboard(QWidget):
                 continue
             bar.setValue(n)
             done = queue_completed.get(key, 0)
-            chain = next(c for c in CHAINS if c.key == key)
-            text = f"{chain.label} ({chain.facility}): {n}/{QUEUE_CAPACITY}"
+            family = next(f for f in FAMILIES if f.key == key)
+            text = f"{family.label} ({family.facility}): {n}/{QUEUE_CAPACITY}"
             if done:
                 text += f" · 완료 {done}개 회수 대기"
                 label.setStyleSheet("color: #f0c060; font-weight: 600;")

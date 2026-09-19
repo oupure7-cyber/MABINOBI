@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from PySide6.QtWidgets import QApplication
-from app.dashboard.altering_routine import CHAINS
+from app.dashboard.altering_routine import FAMILIES
 from app.dashboard.overlay import (
     OVERLAY_BACKGROUND_OPACITY_PERCENT, EnvironmentOverlay, FacilityOverlay, OverlayManager,
 )
@@ -26,14 +26,14 @@ class OverlayStructureTests(unittest.TestCase):
 
     def test_facility_overlay_has_one_row_per_altering_chain(self):
         panel = FacilityOverlay()
-        self.assertEqual(set(panel._rows), {chain.facility for chain in CHAINS})
+        self.assertEqual(set(panel._rows), {family.facility for family in FAMILIES})
 
     def test_facility_short_labels_drop_the_facility_suffix(self):
         panel = FacilityOverlay()
-        for chain in CHAINS:
-            short, _label = panel._rows[chain.facility]
+        for family in FAMILIES:
+            short, _label = panel._rows[family.facility]
             self.assertNotIn('시설', short)
-            self.assertTrue(chain.facility.startswith(short))
+            self.assertTrue(family.facility.startswith(short))
 
     def test_facility_rows_start_with_a_placeholder_before_any_data(self):
         panel = FacilityOverlay()
