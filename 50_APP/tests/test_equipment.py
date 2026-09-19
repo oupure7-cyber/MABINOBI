@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 from app.dashboard.equipment_crafting import EQUIPMENT_RECIPES, TOWN_EQUIPMENT, EquipmentCraftWorker
 from app.dashboard.recipe_cooking import CookingError
-from app.dashboard.job_queue import JOB_CATALOG, EQUIPMENT_WEEKLY_X10
+from app.dashboard.job_queue import JOB_CATALOG, EQUIPMENT_WEEKLY_X6, EQUIPMENT_WEEKLY_X10, EQUIPMENT_WEEKLY_X5
 from app.dashboard.modern_window import kind, quantity
 
 class EquipmentTests(unittest.TestCase):
@@ -59,16 +59,18 @@ class EquipmentTests(unittest.TestCase):
         self.assertEqual(sorted(all_recipes), sorted(EQUIPMENT_RECIPES))
         self.assertEqual(len(all_recipes), len(set(all_recipes)))
 
-    def test_weekly_x10_specs_exist_for_every_recipe_and_stay_out_of_the_catalog(self):
-        self.assertEqual(set(EQUIPMENT_WEEKLY_X10), set(EQUIPMENT_RECIPES))
+    def test_weekly_variants_exist_for_every_recipe_and_stay_out_of_the_catalog(self):
         catalog_keys = {s.key for s in JOB_CATALOG}
-        for recipe, spec in EQUIPMENT_WEEKLY_X10.items():
-            worker = spec.make_worker()
-            self.assertEqual(worker.recipe, recipe)
-            self.assertEqual(worker.remaining, 10)
-            self.assertNotIn(spec.key, catalog_keys)
+        for target, table in ((6, EQUIPMENT_WEEKLY_X6), (10, EQUIPMENT_WEEKLY_X10), (5, EQUIPMENT_WEEKLY_X5)):
+            self.assertEqual(set(table), set(EQUIPMENT_RECIPES))
+            for recipe, spec in table.items():
+                worker = spec.make_worker()
+                self.assertEqual(worker.recipe, recipe)
+                self.assertEqual(worker.remaining, target)
+                self.assertNotIn(spec.key, catalog_keys)
 
-    def test_weekly_x10_spec_reports_its_own_quantity_not_the_x2_default(self):
-        spec = EQUIPMENT_WEEKLY_X10['크레센트 엣지소드']
-        self.assertEqual(quantity(spec), '목표 10개')
-        self.assertEqual(quantity(spec, 2), '목표 20개')
+    def test_weekly_variants_report_their_own_quantity_not_the_x2_default(self):
+        for target, table in ((6, EQUIPMENT_WEEKLY_X6), (10, EQUIPMENT_WEEKLY_X10), (5, EQUIPMENT_WEEKLY_X5)):
+            spec = table['크레센트 엣지소드']
+            self.assertEqual(quantity(spec), f'목표 {target}개')
+            self.assertEqual(quantity(spec, 2), f'목표 {target * 2}개')

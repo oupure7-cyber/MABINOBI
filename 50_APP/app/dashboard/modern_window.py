@@ -6,12 +6,12 @@ import json
 from PySide6.QtCore import Qt, QSettings, QTimer, QThread, Signal
 from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QTabWidget, QButtonGroup, QTableWidgetItem,
+    QLineEdit, QTabWidget, QButtonGroup, QTableWidgetItem, QPushButton,
     QSplitter, QFrame, QGridLayout, QScrollArea, QPlainTextEdit, QComboBox, QMessageBox)
 
 from .main_window import DashboardWindow as LegacyWindow, TopStatsPanel
 from .widgets import CurrencyColumn, Toast, ToggleSwitch, HIDDEN_CURRENCY_NAMES, classify_cli_result
-from .job_queue import JOB_CATALOG, JobSpec, QueuedJob, EQUIPMENT_WEEKLY_X10
+from .job_queue import JOB_CATALOG, JobSpec, QueuedJob, EQUIPMENT_WEEKLY_X6, EQUIPMENT_WEEKLY_X10, EQUIPMENT_WEEKLY_X5
 from .equipment_crafting import TOWN_EQUIPMENT
 from .altering_routine import AlteringRoutineWorker
 from .routine_dashboard import RoutineDashboard
@@ -20,6 +20,7 @@ from ..cli_client import run_cli
 from .job_drag import JobCatalogTable, JobDropTable
 from .item_icons import item_icon, spec_item_name
 from .character_watcher import CharacterWatcher
+from .overlay import OverlayManager
 from .character_manager import CharacterManagerDialog
 from .storage_search import StorageSearchPanel
 from .. import character_profiles
@@ -34,7 +35,11 @@ def title(spec):
 
 def quantity(spec, repeats=1):
     if kind(spec) == '제작':
-        base = 10 if spec.key.startswith('equipment_x10_') else 2
+        # Ask a freshly-constructed (never-started) worker for its own real target
+        # instead of hardcoding per-variant numbers here - stays correct automatically
+        # as new hidden x6/x10/x5-style variants are added (they all set
+        # RecipeCookingWorker.remaining in __init__, before any CLI call happens).
+        base = spec.make_worker().remaining
         return f'목표 {base * repeats:,}개'
     if kind(spec) == '채집':
         return f'최대 {100 * repeats:,}개'
@@ -330,6 +335,9 @@ class DashboardWindow(LegacyWindow):
         self.connection_toggle = ToggleSwitch(); self.connection_toggle.toggled.connect(self._on_toggle)
         toolbar.addWidget(self.connection_toggle)
         toolbar.addWidget(button('새로고침', self.refresh_all))
+        self.overlay_button = QPushButton('오버레이'); self.overlay_button.setCheckable(True)
+        self.overlay_button.toggled.connect(self._on_overlay_toggled)
+        toolbar.addWidget(self.overlay_button)
         toolbar.addWidget(button('캐릭터 관리', self.open_character_manager))
         outer.addLayout(toolbar)
         self.tabs = QTabWidget(); outer.addWidget(self.tabs, 1)
@@ -386,10 +394,21 @@ class DashboardWindow(LegacyWindow):
         self.character_watcher = None
         self._active_profile_id = None
         self._character_manager_dialog = None
+        self.overlay_manager = OverlayManager(self)
         if connect_on_start:
             self._try_connect()
             self.character_watcher = CharacterWatcher(self.project_root, parent=self)
             self.character_watcher.profile_updated.connect(self._on_profile_updated)
+
+    def _on_overlay_toggled(self, checked):
+        self.overlay_manager.set_enabled(checked)
+
+    def _on_connection_result(self, ok, _detail):
+        super()._on_connection_result(ok, _detail)
+        if ok:
+            # 게임이 이미 켜져 있던 상태로 시작했거나, 방금 연결됐거나 - 두 경우 다 여기로
+            # 옴(user request: 시작 시 이미 연결돼 있으면 on, 아니면 off가 기본, 연결되면 on).
+            self.overlay_button.setChecked(True)
 
     def _on_profile_updated(self, profile, all_profiles):
         self._active_profile_id = profile['profile_id']
@@ -451,15 +470,17 @@ class DashboardWindow(LegacyWindow):
 
     def add_weekly_equipment(self, town, weeks):
         """'주간 제작(마을)'/'x5' buttons - queue that town's 3 scroll recipes at once.
-        x5 uses the hidden x10 job (5 weeks' worth batched into as few execute_crafting
-        calls as the facility allows) instead of adding the x2 job with repeats=5, which
-        would re-run the whole x2 job 5 separate times (user request, 2026-09-20)."""
+
+        임무 게시판은 같은 스크롤을 한 주에 최대 3개까지 팔아서(user, 2026-09-20), 한 주 몫은
+        3 x 2(스크롤 하나당 장비 2개) = 6개 - 그래서 x2 카탈로그 잡이 아니라 숨은 x6 잡
+        (EQUIPMENT_WEEKLY_X6)을 쓴다. x5 버튼은 목표 15개를 새 x15 잡을 따로 만드는 대신
+        기존 x10 잡 + 새 x5 잡을 같이 큐에 넣어서 채운다(10+5=15, user 지정)."""
         for recipe in TOWN_EQUIPMENT[town]:
             if weeks == 5:
-                spec = EQUIPMENT_WEEKLY_X10[recipe]
+                self.add_job(EQUIPMENT_WEEKLY_X10[recipe])
+                self.add_job(EQUIPMENT_WEEKLY_X5[recipe])
             else:
-                spec = next(s for s in self.specs if s.key == f'equipment_{recipe}')
-            self.add_job(spec)
+                self.add_job(EQUIPMENT_WEEKLY_X6[recipe])
 
     def _find_equipment_spec(self, recipe_name):
         """Match a scroll-derived recipe name to a catalog spec, tolerant of whitespace
@@ -600,4 +621,5 @@ class DashboardWindow(LegacyWindow):
             self.music_panel._stop_playback()
         if self.character_watcher is not None:
             self.character_watcher.stop()
+        self.overlay_manager.set_enabled(False)
         self.routine.close(); event.accept()
