@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-19 (두 번째 릴리즈: GitHub Release v0.9.1 게시 — 친구의 요리/장비 제작 UI 재설계 반영)
+
+- 친구가 작업한 `ui-cooking-equipment-20260919` 브랜치(통합 작업 UI — 채집/요리/제작/무한가공소 탭, 드래그앤드롭 대기열, 아이템 아이콘)를 main에 병합. 브랜치가 v0.9.0 이전 커밋에서 갈라져 나가 있어 main.py/README.md/CHANGELOG.md/.gitignore/exe에서 충돌 발생, 전부 수동 해결
+- **병합 중 발견/수정한 버그**: 병합 직후 `--ui-self-test`로 실제 창을 띄워보니 `AttributeError: 'DashboardWindow' object has no attribute 'open_wizard'`로 즉시 크래시 — main에서 이미 제거한 "설치 마법사" 버튼을 새 UI(`modern_window.py`)가 여전히 참조하고 있었음. 버튼 제거 후 재검증(스크린샷으로 채집/요리/제작 탭 정상 동작 확인)
+- `APP_VERSION`을 `0.9.1`로 올리고 exe 재빌드, 유닛 테스트 20개 전부 통과 확인 후 GitHub Release `v0.9.1` 게시(자산명 `MabiNobi.exe`, ASCII — v0.9.0에서 실측 확인한 자산명 버그 회피)
+
 ## 2026-09-19 (첫 실제 배포: GitHub Release v0.9.0 게시 — GitHub 자산명은 ASCII만 허용된다는 것 실측으로 발견/수정)
 
 - 사용자 요청으로 첫 GitHub Release 생성: `APP_VERSION`을 `1.0.0` → `0.9.0`으로 낮춰서 시작(아직 1.0을 붙이기엔 이르다는 판단), exe 재빌드 후 GitHub API로 Release 생성 + `마비노비.exe` 자산 업로드까지 전부 진행(`gh` CLI가 없어서 REST API를 PowerShell로 직접 호출)
