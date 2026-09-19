@@ -6,7 +6,7 @@
 
 현재 진입 화면은 `app/dashboard/modern_window.py`입니다. 아래의 이전 레이아웃 설명보다 이 절이 우선합니다.
 
-- 상위 메뉴: 작업 / 악보. 작업에는 채집 / 요리 / 제작 / 무한가공소가 있습니다.
+- 상위 메뉴: 작업 / 악보 / 창고. 작업에는 채집 / 요리 / 제작 / 무한가공소가 있습니다.
 - 왼쪽에서 작업을 추가하고 오른쪽 통합 대기열에서 시작, 횟수 변경, 순서 이동, 삭제를 합니다. 작업 추가만으로 실행되지 않습니다.
 - 전체 일시정지는 이미 요청한 채집·요리 작업이 끝난 후 적용됩니다. 실행 중인 작업은 직접 수정할 수 없으며, 건너뛰기 역시 현재 요청 종료 후 적용됩니다.
 - 무한가공소는 기존 가공 워커를 사용하며, 무한 실행과 기존 1시간 실행을 제공합니다. 직접 건너뛰어야 무한 작업 뒤의 작업이 실행됩니다. 가공 현황은 해당 탭 안에서 표시됩니다.
@@ -16,6 +16,7 @@
 - 즐겨찾기와 추가 버튼을 제거하고 목록에서 대기열로 드래그하여 추가합니다. 최근 사용은 이 PC에 저장됩니다. 작업 대기열은 앱을 닫으면 유지되지 않습니다.
 - 아이템 아이콘은 모비라이프에서 이름이 일치하는 항목만 캐시합니다. 출처는 `app/dashboard/assets/item_icons/manifest.json`에 기록하며, 아직 매핑되지 않은 새 요리·장비에는 임의 아이콘을 표시하지 않습니다.
 - 게임 확인 팝업이 감지되면 일시정지하고 사용자가 게임에서 확인한 뒤 재개해야 합니다.
+- **창고**(2026-09-19): 계정 전체 아이템 검색기. 검색창에 아이템 이름을 입력하면(부분 일치) `character_data`에 감지된 모든 캐릭터의 인벤토리/캐릭터창고/공용보관함을 뒤져서 `{이름(캐릭터 관리에서 지정 안 했으면 직업)}/{서버명} - {인벤토리|보관함|공용보관함}` 그룹별로 아이템명/수량을 보여줍니다. CLI가 소모품류만 주므로(장비/코스튬/펫 제외) 검색 범위도 그만큼으로 한정됨.
 
 검증: `python -m unittest discover -s tests -v` (게임 명령을 보내지 않는 대기열 테스트).
 
@@ -39,8 +40,13 @@ python -m PyInstaller --noconfirm --distpath .. mabinobi.spec
 
 - `main.py` — 진입점. 바로 대시보드로 진입.
 - `app/version.py` / `app/updater.py` / `app/dashboard/update_worker.py` — 자동 업데이트(2026-09-19). exe로 빌드된 경우(`sys.frozen`)에만 동작 — 시작 시 백그라운드로 GitHub Releases 최신 태그를 조회해 `app/version.py`의 `APP_VERSION`보다 높으면 조용히 다운로드해뒀다가, 가공 무한/JOB 대기열이 idle일 때 exe 자신을 교체하고 재시작함. GitHub 관련 UI/URL은 사용자에게 전혀 노출되지 않음. 새 버전 배포 절차: `APP_VERSION` 올리기 → exe 재빌드 → GitHub에 `vX.Y.Z` 태그로 Release 생성, `마비노비.exe` 이름 그대로 자산 첨부, Publish.
-- `app/cli_client.py` — `MabinogiMobile_CLI.exe` 서브프로세스 호출 래퍼 (`MABINOGI_CLI_PATH` 환경변수로 경로 변경 가능).
-- `app/dashboard/` — 메인 화면. 레이아웃: 상단 컨트롤 바(스탯 4x3 + 게임 연결 토글/사용 가이드) → 본문 좌측 재화 컬럼 + 중앙(상: 가공 무한 토글, 하: 음악 플레이어) + 우측 JOB 대기열 컬럼.
+- `app/cli_client.py` — `MabinogiMobile_CLI.exe` 서브프로세스 호출 래퍼. 경로 우선순위: `MABINOGI_CLI_PATH` 환경변수(개발자용 강제 override) > `set_cli_path()`로 설정된 경로(아래 `cli_setup.py` 참고) > 넥슨 기본 설치 경로. 동시 호출 충돌 방지용 락 포함 — `run_cli()`는 블로킹 획득, `try_run_cli()`는 바쁘면 즉시 `None`(백그라운드 폴링 전용).
+- `app/cli_settings.py` / `app/dashboard/cli_setup.py` — MabinogiMobile_CLI.exe 경로 자동 감지(2026-09-19). 기본 경로(`C:\Nexon\MabinogiMobile\`)에 없으면 시작 시 안내 팝업 + 폴더 선택 창을 띄워 설치 폴더를 직접 고르게 하고, `cli_settings.json`(프로젝트 루트, `character_data/`와 같은 위치)에 저장 — exe 자체는 자동 업데이트 때 파일만 교체되고 이 파일은 그대로 남으므로 새 버전에서도 다시 물어보지 않음. `MABINOGI_CLI_PATH`가 설정돼 있으면 이 과정 자체를 건너뜀(개발자 의도를 존중).
+- `app/character_profiles.py` / `app/dashboard/character_watcher.py` — 캐릭터 전환 감지(2026-09-19). CLI엔 "지금 캐릭터가 몇 번인지" 알려주는 필드가 없고, 캐릭터/서버/계정 개수에 대한 가정도 두지 않는다(여러 서버·여러 계정에 걸쳐 부캐를 두는 사용자도 있음). 캐릭터 귀속 재화인 냥 토큰/하트 토큰을 2초마다 폴링하다 **둘 다 동시에** 바뀌면 캐릭터가 바뀐 것으로 판단(`try_run_cli`로 폴링해 다른 워커의 CLI 호출을 절대 막지 않음). 전환 감지 시(또는 최초 실행 시) `get_my_info`+`get_items`를 한 번 더 조회해 직업명+서버명+전투력으로 기존 프로필과 매칭(같은 직업·같은 서버 중 전투력 10% 이내면 동일 캐릭터로 간주 — 서버/계정까지 구분해야 다른 서버·다른 계정의 캐릭터가 우연히 같은 직업/전투력이어도 안 섞임)하거나 새로 생성, `character_data/profile_N.json`에 캐릭터 정보/재화/인벤토리/캐릭터창고/계정창고를 전부 저장. 계정창고를 공용 파일 하나로 따로 두지 않고 프로필마다 저장하는 이유: 계정창고는 "같은 계정+같은 서버" 안에서만 공유라서, 파일 하나로 두면 다른 서버·다른 계정 캐릭터가 감지되는 순간 그 데이터로 덮어써져 버림. `profile_N`은 내부 매칭용 키일 뿐, 화면(캐릭터 정보▾/정령의 날개 사이 라벨)엔 항상 `이름(⚔️전투력)` 형태로 표시 — 이름은 `캐릭터 관리`에서 사용자가 바꾸기 전까진 직업명. 계정 전체 아이템 검색기의 데이터 기반. `get_items`가 소모품류만 주므로(장비/코스튬/펫 제외) 저장되는 인벤토리/창고도 그 범위로 한정됨.
+- `app/dashboard/character_manager.py` — "캐릭터 관리" 버튼(2026-09-19, 예전 "사용 가이드" 버튼 자리) → 위에서 감지된 프로필 목록(프로필ID/이름, 클래스, 서버, 최종 접속)을 보여주는 비모달 창. 선택한 캐릭터의 표시 이름을 직접 지정("이름 변경")하거나, 이 앱의 로컬 기록만 삭제("삭제" — 실제 게임 캐릭터/아이템엔 영향 없음, 다시 접속하면 새로 쌓임)할 수 있음.
+- `app/dashboard/storage_search.py` — "창고" 탭(2026-09-19, 계정 전체 아이템 검색기). 검색어(빈 칸이면 전체 목록)를 `character_profiles.search_items()`(순수 로직)에 넘기고, 결과를 `QTreeWidget` 그룹으로 렌더링: ①"전체 합계"(모든 캐릭터 인벤토리+캐릭터창고+계정창고 합산) → ②"공용보관함"(계정+서버 공유라 캐릭터별 중복 없이 하나만) → ③`{이름}/{서버} - {인벤토리|보관함}`(캐릭터별). 아이템 이름의 `<color=..>...</color>` 같은 리치텍스트 태그는 제거하고 안의 텍스트만 표시(`_clean_name`). "새로고침" 버튼으로 현재 활성 캐릭터의 인벤토리/창고/계정창고만 즉시 재조회 가능. 검색 결과 개수와 무관하게 레이아웃이 안 흔들리도록, "결과 없음" 등은 별도 위젯을 숨기는 대신 트리 안에 안내 행 하나로 표시.
+- `app/dashboard/ui_kit.py` — `modern_window.py`/`character_manager.py`/`storage_search.py`가 함께 쓰는 다크 테마 스타일시트(`STYLE`)와 위젯 생성 헬퍼(`heading`/`button`/`table`). 순환 임포트를 피하려고 별도 모듈로 분리.
+- `app/dashboard/` — 메인 화면. 레이아웃: 상단 컨트롤 바(스탯 4x3 + 게임 연결 토글/캐릭터 관리) → 본문 좌측 재화 컬럼 + 중앙(상: 가공 무한 토글, 하: 음악 플레이어) + 우측 JOB 대기열 컬럼.
   - `main_window.py` — 메뉴바 없음. 앱 실행 시 `connection.py`(백그라운드 스레드)로 게임 연결 자동 시도, 실패 시 `connector_guide.py` 비모달 팝업(게임 내 AI 커넥터 활성화 안내 + 스크린샷 2장). `TopStatsPanel`(전투력/생활력/매력/마도저항/공격력/최대체력/방어력/데코점수/힘/솜씨/지력/행운, 4x3 고정 그리드)이 컨트롤 바 왼쪽에 있음. 중앙은 `QSplitter(Vertical)`로 `GatherPanel`/`MusicPanel` 분할, 오른쪽엔 고정폭 `JobQueuePanel`.
   - `modern_window.py` — 위 "통합 작업 UI" 절에서 설명한 새 진입 화면. `main_window.py`의 `DashboardWindow`를 `LegacyWindow`로 확장해 기존 CLI 워커/재화 에셋을 그대로 재사용하면서 작업/악보 통합 탭 레이아웃을 새로 구성.
   - `equipment_crafting.py` / `recipe_cooking.py` — 요리·장비 제작 JOB(부족 재료 채집 → 제작, 1회 제작 상한 자동 분할).
@@ -54,7 +60,7 @@ python -m PyInstaller --noconfirm --distpath .. mabinobi.spec
   - `food_crafting_job.py` — 재료 채집→`execute_crafting` 1회성 JOB 타입(`FoodCraftWorker`). 부족한 재료만 채집 후 목표 개수 제작, 시설의 1회 제작 상한(`invalid_count`+`maxCount`)에 걸리면 자동 분할.
   - `gather_job.py` — 채집 한 번짜리 1회성 JOB 타입(`GatherJobWorker`) + `GATHER_ITEMS`(예전 버튼 목록, 25종).
   - `music_panel.py` — 스포티파이류 플레이어. 좌: 검색창 + 보유 악보 카탈로그(`get_music_scores`, 드래그 소스). 우: 현재 재생 곡 + 재생 대기열(드래그로 순서 변경/카탈로그에서 끼워넣기/휴지통으로 삭제) + 하단 `InstrumentBar`(보유 악기 버튼, 클릭 시 `change_instrument`). 대기열은 게임에 없는 개념이라 `get_activity`의 `Performance.IsPlaying`을 4초 간격 폴링해서 곡이 끝나면 자동으로 다음 곡 재생.
-  - `guide_viewer.py` — "사용 가이드" 버튼 → `10_RESEARCH/03_cli_command_reference_*.md` 중 최신 날짜 파일을 `QTextBrowser.setMarkdown()`으로 큰 팝업에 렌더링.
+  - `guide_viewer.py` — 예전 "사용 가이드" 버튼이 쓰던 `10_RESEARCH/03_cli_command_reference_*.md` 렌더러. 2026-09-19에 그 버튼을 캐릭터 관리로 교체하면서 지금 화면(`modern_window.py`)에선 더 이상 안 쓰임 — `main_window.py`(레거시, 실제로 띄워지지 않음)에만 배선이 남아있음. `.md` 문서 자체는 `10_RESEARCH`에 그대로 있고 exe 빌드에도 원래부터 포함 안 됐음(`mabinobi.spec` 참고).
   - `assets/currency_icons/` — 게임 내 재화 화면 스크린샷에서 크롭한 아이콘 28개 + `manifest.json`(`get_currencies`의 `DisplayName` 매핑).
   - `assets/item_icons/` — 요리/장비 아이템 아이콘 캐시 + `manifest.json`.
 - `build.ps1` / `mabinobi.spec` — exe 재빌드 스크립트/스펙. DLL 검색 경로를 격리해서 외부 이미지 도구의 오래된 Windows API DLL이 번들에 섞이지 않게 함.

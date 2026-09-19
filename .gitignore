@@ -23,3 +23,9 @@ dist/
 !50_APP/mabinobi.spec
 # Local rollback copies; only the main executable is distributed.
 /마비노비.*.exe
+
+# Per-character data snapshots (personal game data, not shared/committed)
+/character_data/
+
+# Per-machine MabinogiMobile_CLI.exe location (varies per user's install, not shared)
+/cli_settings.json

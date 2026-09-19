@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
-from PySide6.QtCore import Qt, QSettings, QTimer, QThread, Signal, QSize
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QTabWidget, QButtonGroup, QTableWidget, QTableWidgetItem, QHeaderView,
+from PySide6.QtCore import Qt, QSettings, QTimer, QThread, Signal
+from PySide6.QtGui import QCursor
+from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QLineEdit, QTabWidget, QButtonGroup, QTableWidgetItem,
     QSplitter, QFrame, QGridLayout, QScrollArea, QPlainTextEdit, QComboBox, QMessageBox)
 
 from .main_window import DashboardWindow as LegacyWindow, TopStatsPanel
@@ -17,54 +18,11 @@ from .music_panel import MusicPanel
 from ..cli_client import run_cli
 from .job_drag import JobCatalogTable, JobDropTable
 from .item_icons import item_icon, spec_item_name
-
-STYLE = """
-QWidget { background: #121e23; color: #e4e9eb; font-family: 'Malgun Gothic'; font-size: 14px; }
-QMainWindow { background: #121e23; }
-QLabel { background: transparent; }
-QLabel[heading="true"] { font-size: 19px; font-weight: 700; padding: 6px 0; }
-QPushButton { background: #19292f; border: 1px solid #3a5059; border-radius: 4px; padding: 6px 12px; }
-QPushButton:hover { background: #253b42; border-color: #6a9186; }
-QPushButton:checked { color: #90dcb5; background: #1c3a32; border-color: #69b18c; }
-QPushButton:disabled { color: #6b7a80; border-color: #293a41; }
-QTableWidget QPushButton { padding: 3px; }
-QTableWidget::item { border-bottom: 1px solid #293b43; padding: 4px; }
-QLineEdit, QComboBox { background: #101b20; border: 1px solid #3a5059; border-radius: 4px; padding: 7px; }
-QTableWidget, QListWidget, QPlainTextEdit { background: #121e23; border: 1px solid #293b43; gridline-color: #293b43; selection-background-color: #24483c; }
-QListWidget::item { padding: 8px; border-bottom: 1px solid #293b43; }
-QHeaderView::section { background: #20313a; color: #bdcbd0; border: none; padding: 7px; }
-QTabWidget::pane { border: none; border-top: 1px solid #33484e; }
-QTabBar::tab { padding: 12px 27px; color: #bbc6cb; border-bottom: 3px solid transparent; }
-QTabBar::tab:selected { color: #8bd8ae; border-bottom: 3px solid #8bd8ae; }
-QScrollBar:vertical { background: #132027; width: 9px; }
-QScrollBar::handle:vertical { background: #39515a; min-height: 25px; }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-QFrame#infoPanel { border: 1px solid #54706f; background: #17272d; }
-QSplitter::handle { background: #30454c; width: 1px; }
-"""
-
-def heading(text):
-    label = QLabel(text)
-    label.setProperty('heading', True)
-    return label
-
-def button(text, callback):
-    b = QPushButton(text)
-    b.clicked.connect(callback)
-    return b
-
-def table(headers, widget_class=QTableWidget):
-    t = widget_class(0, len(headers))
-    t.setIconSize(QSize(26, 26))
-    t.setHorizontalHeaderLabels(headers)
-    t.verticalHeader().hide()
-    t.setEditTriggers(QTableWidget.NoEditTriggers)
-    t.setSelectionBehavior(QTableWidget.SelectRows)
-    t.setShowGrid(False)
-    t.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-    t.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-    t.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-    return t
+from .character_watcher import CharacterWatcher
+from .character_manager import CharacterManagerDialog
+from .storage_search import StorageSearchPanel
+from .. import character_profiles
+from .ui_kit import STYLE, heading, button, table
 
 def kind(spec):
     if spec.key.startswith('equipment_'): return '제작'
@@ -336,7 +294,8 @@ class DashboardWindow(LegacyWindow):
         QMainWindow.__init__(self)
         self.project_root = project_root
         self.setWindowTitle('마비노비')
-        self.resize(1500, 920); self.setMinimumSize(1100, 700)
+        self.setMinimumSize(1100, 700)
+        self._fit_to_active_screen()
         self.setStyleSheet(STYLE)
         self._connection_worker = None; self._guide_dialog = None; self.info_worker = None
         self.settings = QSettings('MabiNobi', 'Workspace')
@@ -350,13 +309,14 @@ class DashboardWindow(LegacyWindow):
         toolbar = QHBoxLayout()
         self.character_btn = button('캐릭터 정보 ▾', self.toggle_info)
         toolbar.addWidget(self.character_btn)
+        self.active_character_label = QLabel(''); toolbar.addWidget(self.active_character_label)
         self.wings = QLabel('정령의 날개  —'); toolbar.addWidget(self.wings)
         toolbar.addWidget(button('주요 재화 ▾', self.show_currencies)); toolbar.addStretch()
         toolbar.addWidget(QLabel('게임 연결'))
         self.connection_toggle = ToggleSwitch(); self.connection_toggle.toggled.connect(self._on_toggle)
         toolbar.addWidget(self.connection_toggle)
         toolbar.addWidget(button('새로고침', self.refresh_all))
-        toolbar.addWidget(button('사용 가이드', self.open_guide))
+        toolbar.addWidget(button('캐릭터 관리', self.open_character_manager))
         outer.addLayout(toolbar)
         self.tabs = QTabWidget(); outer.addWidget(self.tabs, 1)
         work = QWidget(); w = QHBoxLayout(work); w.setContentsMargins(0, 12, 0, 0)
@@ -388,6 +348,8 @@ class DashboardWindow(LegacyWindow):
         self.split.addWidget(left); self.split.addWidget(self.queue); self.split.setSizes([700, 720])
         self.tabs.addTab(work, '작업')
         self.music_panel = ScorePanel(); self.tabs.addTab(self.music_panel, '악보')
+        self.storage_panel = StorageSearchPanel(self.project_root); self.tabs.addTab(self.storage_panel, '창고')
+        self.storage_panel.get_active_profile_id = lambda: self._active_profile_id
         self.music_panel.guard = lambda: self.queue.worker is not None or not self.queue.paused
         self.queue.activity_guard = lambda: self.music_panel._current_title is not None
         self.music_status = QLabel(''); self.music_panel.layout().insertWidget(1, self.music_status)
@@ -395,8 +357,34 @@ class DashboardWindow(LegacyWindow):
         self.make_info_panel()
         self.toast = Toast(self)
         self.render_catalog()
+        self.character_watcher = None
+        self._active_profile_id = None
+        self._character_manager_dialog = None
         if connect_on_start:
             self._try_connect()
+            self.character_watcher = CharacterWatcher(self.project_root, parent=self)
+            self.character_watcher.profile_updated.connect(self._on_profile_updated)
+
+    def _on_profile_updated(self, profile, all_profiles):
+        self._active_profile_id = profile['profile_id']
+        self.active_character_label.setText(character_profiles.display_name(profile))
+
+    def refresh_active_character_label(self):
+        """Re-render the toolbar label from disk - e.g. after a rename/delete in 캐릭터 관리."""
+        if self._active_profile_id is None:
+            return
+        profiles = character_profiles.load_profiles(self.project_root)
+        current = next((p for p in profiles if p['profile_id'] == self._active_profile_id), None)
+        self.active_character_label.setText(character_profiles.display_name(current) if current else '')
+
+    def open_character_manager(self):
+        if self._character_manager_dialog is None:
+            self._character_manager_dialog = CharacterManagerDialog(self.project_root, self)
+            self._character_manager_dialog.changed.connect(self.refresh_active_character_label)
+        self._character_manager_dialog.refresh()
+        self._character_manager_dialog.show()
+        self._character_manager_dialog.raise_()
+        self._character_manager_dialog.activateWindow()
 
     def select_category(self, name):
         self.category = name; self.render_catalog()
@@ -492,6 +480,17 @@ class DashboardWindow(LegacyWindow):
             self.currency_grid.addWidget(chip, i % midpoint, i // midpoint)
             if name == '정령의 날개': self.wings.setText(f'정령의 날개  {amount:,}')
 
+    def _fit_to_active_screen(self):
+        """Size to 80% of, and center on, whichever screen the cursor is currently on -
+        so the window never starts larger than the monitor the user is actually at."""
+        screen = QApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
+        avail = screen.availableGeometry()
+        self.resize(int(avail.width() * 0.8), int(avail.height() * 0.8))
+        # Re-read the actual size: resize() above is clamped to setMinimumSize(), so on
+        # a very small screen the real size can end up bigger than the 80% requested.
+        w, h = self.width(), self.height()
+        self.move(avail.x() + (avail.width() - w) // 2, avail.y() + (avail.height() - h) // 2)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, 'info') and self.info.isVisible():
@@ -506,4 +505,6 @@ class DashboardWindow(LegacyWindow):
             self.queue.render(); event.ignore(); return
         if self.music_panel._current_title:
             self.music_panel._stop_playback()
+        if self.character_watcher is not None:
+            self.character_watcher.stop()
         self.routine.close(); event.accept()
