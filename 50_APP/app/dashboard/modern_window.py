@@ -33,7 +33,9 @@ def title(spec):
     return spec.name.replace('채집: ', '').replace('요리: ', '').replace('제작: ', '').replace(' x100', '')
 
 def quantity(spec, repeats=1):
-    if kind(spec) == '제작': return f'목표 {2 * repeats:,}개'
+    if kind(spec) == '제작':
+        base = 10 if spec.key.startswith('equipment_x10_') else 2
+        return f'목표 {base * repeats:,}개'
     if kind(spec) == '채집':
         return f'최대 {100 * repeats:,}개'
     if kind(spec) == '요리':
@@ -45,6 +47,16 @@ class InfoWorker(QThread):
     result = Signal(object, object)
     def run(self):
         self.result.emit(run_cli('get_my_info'), run_cli('get_currencies'))
+
+
+SCROLL_PREFIX = '제작 스크롤: '  # 임무 게시판에서 사는 퀘스트 아이템 - 인벤토리에만 보관 가능(창고 불가)
+
+
+class ScrollInventoryWorker(QThread):
+    result = Signal(list)
+    def run(self):
+        data = run_cli('get_items', json.dumps({'name': SCROLL_PREFIX}, ensure_ascii=False))
+        self.result.emit(data if isinstance(data, list) else [])
 
 
 class WorkQueue(QWidget):
@@ -299,6 +311,7 @@ class DashboardWindow(LegacyWindow):
         self._fit_to_active_screen()
         self.setStyleSheet(STYLE)
         self._connection_worker = None; self._guide_dialog = None; self.info_worker = None
+        self._scroll_worker = None
         self.settings = QSettings('MabiNobi', 'Workspace')
         self.recent = self.settings.value('recent', [], type=list)
         self.category = '채집'; self.filter_mode = '전체'
@@ -409,7 +422,7 @@ class DashboardWindow(LegacyWindow):
         self.catalog_note.setText('새 요리는 목표 수량 이상을 1회씩 제작합니다. 제작 호출마다 정령의 날개 5개가 소모되며, 별도 준비가 필요한 재료는 안내 후 멈춥니다.' if self.category == '요리' else '아이템을 오른쪽 대기열로 드래그한 뒤 시작하세요.')
         needle = self.search.text().strip().lower()
         if self.category == '제작':
-            self.catalog_note.setText('한 작업당 장비 2개 제작 · 오른쪽 대기열로 드래그하세요. 제작 1회마다 정령의 날개 5개 소모. 별도 가공·구매 재료가 부족하면 안내 후 멈춥니다.')
+            self.catalog_note.setText('오른쪽 대기열로 드래그하세요. 요청 1회마다 정령의 날개 5개 소모. x5 스크롤이 가장 경제적입니다!\n별도 가공/구매 재료가 부족하면 안내 후 멈춥니다.')
         specs = [s for s in self.specs if kind(s) == self.category and needle in s.name.lower()]
         if self.filter_mode == '최근 사용': specs = sorted([s for s in specs if s.key in self.recent], key=lambda s: self.recent.index(s.key))
         self.catalog.setRowCount(len(specs))
@@ -448,9 +461,59 @@ class DashboardWindow(LegacyWindow):
                 spec = next(s for s in self.specs if s.key == f'equipment_{recipe}')
             self.add_job(spec)
 
+    def _find_equipment_spec(self, recipe_name):
+        """Match a scroll-derived recipe name to a catalog spec, tolerant of whitespace
+        differences - the live API is known to be inconsistent about spacing within an
+        item name (recipe_info() already normalizes for the same reason when matching
+        get_craftable_items)."""
+        target = ''.join(recipe_name.split()).casefold()
+        for s in self.specs:
+            if s.key.startswith('equipment_') and ''.join(s.key[len('equipment_'):].split()).casefold() == target:
+                return s
+        return None
+
     def craft_all_owned_scrolls(self):
-        # TODO: 사용자가 나중에 동작을 지정하기로 함 (2026-09-20) - 지금은 자리만 마련.
-        self.toast.show_message('아직 준비 중인 기능입니다.')
+        """'보유 스크롤 모두 진행' - 인벤토리의 "제작 스크롤: <이름>"을 전부 확인해서, 아는
+        레시피(EQUIPMENT_RECIPES)면 그 개수만큼 반복(◀N▶)으로 대기열에 추가한다. 스크롤은
+        창고(캐릭터창고/계정창고)엔 보관이 안 되는 아이템이라 인벤토리만 본다. 모르는
+        스크롤(아직 JOB으로 안 만든 다른 제작 종류)은 조용히 건너뛴다(user, 2026-09-20)."""
+        if self._scroll_worker is not None and self._scroll_worker.isRunning():
+            return
+        self.toast.show_message('보유 스크롤 확인 중...')
+        self._scroll_worker = ScrollInventoryWorker(self)
+        self._scroll_worker.result.connect(self._on_scrolls_loaded)
+        self._scroll_worker.start()
+
+    def _on_scrolls_loaded(self, items):
+        added = []
+        unknown = 0
+        for item in items:
+            name = item.get('DisplayName', '')
+            if item.get('Location') != 'inventory' or not name.startswith(SCROLL_PREFIX):
+                continue
+            recipe = name[len(SCROLL_PREFIX):]
+            spec = self._find_equipment_spec(recipe)
+            if spec is None:
+                unknown += 1
+                continue
+            count = item.get('Count', 0)
+            if count <= 0:
+                continue
+            repeats = max(1, min(9, count))
+            self.queue.jobs.append(QueuedJob(spec, repeats))
+            self.recent = [spec.key] + [k for k in self.recent if k != spec.key]
+            added.append(f'{title(spec)} x{repeats}')
+        if added:
+            self.settings.setValue('recent', self.recent[:30])
+            self.queue.render(); self.queue.start_next()
+            summary = ', '.join(added)
+            if unknown: summary += f' (모르는 스크롤 {unknown}종 제외)'
+            self.queue.message(f'스크롤 대기열 추가: {summary}')
+            self.toast.show_message(f'스크롤 {len(added)}종 대기열에 추가됨', 4000)
+        elif unknown:
+            self.toast.show_message(f'모르는 스크롤 {unknown}종만 있어 건너뛰었습니다.')
+        else:
+            self.toast.show_message('보유한 제작 스크롤이 없습니다.')
 
     def make_info_panel(self):
         self.info = QFrame(self.centralWidget()); self.info.setObjectName('infoPanel')

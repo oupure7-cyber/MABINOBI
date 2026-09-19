@@ -17,7 +17,7 @@ class EquipmentTests(unittest.TestCase):
             self.assertEqual(quantity(spec, 2), '목표 4개')
 
     def test_uses_returned_name_and_crafts_in_a_single_batched_call(self):
-        w = EquipmentCraftWorker('론 엣지 소드S')
+        w = EquipmentCraftWorker('론 엣지소드S')
         row = {'DisplayName':'론 엣지소드s', 'ProducedPerCraft':1, 'Craftable':True}
         with patch.object(w, 'items', return_value=[row]), \
              patch('app.dashboard.recipe_cooking.run_cli', return_value={'status':'accepted', 'result':'completed'}) as cli:
@@ -50,7 +50,7 @@ class EquipmentTests(unittest.TestCase):
         self.assertEqual(blocked, ['not_enough_ingredient'])
 
     def test_ambiguous_name_does_not_select_arbitrary_recipe(self):
-        w = EquipmentCraftWorker('론 엣지 소드S')
+        w = EquipmentCraftWorker('론 엣지소드S')
         with patch.object(w, 'items', return_value=[{'DisplayName':'론엣지소드S'}, {'DisplayName':'론 엣지소드s'}]):
             with self.assertRaises(CookingError): w.recipe_info(w.recipe)
 
@@ -67,3 +67,8 @@ class EquipmentTests(unittest.TestCase):
             self.assertEqual(worker.recipe, recipe)
             self.assertEqual(worker.remaining, 10)
             self.assertNotIn(spec.key, catalog_keys)
+
+    def test_weekly_x10_spec_reports_its_own_quantity_not_the_x2_default(self):
+        spec = EQUIPMENT_WEEKLY_X10['크레센트 엣지소드']
+        self.assertEqual(quantity(spec), '목표 10개')
+        self.assertEqual(quantity(spec, 2), '목표 20개')
