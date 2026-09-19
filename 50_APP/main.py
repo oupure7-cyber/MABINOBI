@@ -1,6 +1,6 @@
 """Entry point for 마비노비 (MabiNobi), the Mabinogi AI 자동화 제어 앱.
 
-Goes straight to the dashboard (app/dashboard/main_window.py), which tries to connect to
+Goes straight to the dashboard (app/dashboard/modern_window.py), which tries to connect to
 the game on its own at startup.
 
     python 50_APP/main.py
@@ -18,11 +18,11 @@ exe로 배포된 경우 그 폴더가 없으면 해당 버튼만 "못 찾음"으
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
-from app.dashboard.main_window import DashboardWindow
+from app.dashboard.modern_window import DashboardWindow
 
 if getattr(sys, "frozen", False):
     PROJECT_ROOT = Path(sys.executable).resolve().parent
@@ -70,8 +70,43 @@ def main() -> int:
     app.setApplicationName("마비노비")
     apply_dark_theme(app)
 
-    dashboard = DashboardWindow(PROJECT_ROOT)
+    self_test = '--ui-self-test' in sys.argv
+    dashboard = DashboardWindow(PROJECT_ROOT, connect_on_start=not self_test)
     dashboard.show()
+
+    if self_test:
+        # Exercise the frozen Qt runtime and real window, without contacting the game.
+        output = Path(sys.argv[sys.argv.index('--ui-self-test') + 1])
+        def report_ready():
+            import json
+            output.write_text(json.dumps({
+                'visible': dashboard.isVisible(),
+                'title': dashboard.windowTitle(),
+                'tabs': [dashboard.tabs.tabText(i) for i in range(dashboard.tabs.count())],
+                  'catalog_rows': dashboard.catalog.rowCount(),
+                  'catalog_columns': dashboard.catalog.columnCount(),
+                  'catalog_icons': sum(not dashboard.catalog.item(i, 0).icon().isNull() for i in range(dashboard.catalog.rowCount())),
+                  'catalog_drag_enabled': dashboard.catalog.dragEnabled(),
+                  'queue_accepts_drops': dashboard.queue.list.acceptDrops(),
+            }, ensure_ascii=False), encoding='utf-8')
+            dashboard.grab().save(str(output.with_suffix('.png')))
+            dashboard.select_category('요리')
+            app.processEvents()
+            dashboard.grab().save(str(output.with_name(output.stem + '-cooking.png')))
+            output.with_name(output.stem + '-cooking.json').write_text(json.dumps({
+                'rows': dashboard.catalog.rowCount(),
+                'names': [dashboard.catalog.item(i, 0).text() for i in range(dashboard.catalog.rowCount())],
+            }, ensure_ascii=False), encoding='utf-8')
+            dashboard.select_category('제작')
+            app.processEvents()
+            dashboard.grab().save(str(output.with_name(output.stem + '-equipment.png')))
+            output.with_name(output.stem + '-equipment.json').write_text(json.dumps({
+                'rows': dashboard.catalog.rowCount(),
+                'names': [dashboard.catalog.item(i, 0).text() for i in range(dashboard.catalog.rowCount())],
+            }, ensure_ascii=False), encoding='utf-8')
+            dashboard.close()
+            app.quit()
+        QTimer.singleShot(800, report_ready)
 
     return app.exec()
 

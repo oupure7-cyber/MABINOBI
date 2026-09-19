@@ -63,6 +63,8 @@ from PySide6.QtWidgets import (
 
 from .altering_routine import AlteringRoutineWorker
 from .food_crafting_job import FoodCraftWorker, Ingredient
+from .recipe_cooking import RECIPES, RecipeCookingWorker
+from .equipment_crafting import EQUIPMENT_RECIPES, EquipmentCraftWorker
 from .gather_job import GATHER_ITEMS, GatherJobWorker
 
 MIN_REPEATS = 1
@@ -123,6 +125,16 @@ JOB_CATALOG: list[JobSpec] = [
 JOB_CATALOG.extend(
     JobSpec(key=f"gather_{item}", name=f"채집: {item} x100", make_worker=_make_gather_job(item))
     for item in GATHER_ITEMS
+)
+JOB_CATALOG.extend(
+    JobSpec(key=f'cooking_{recipe}_{count}', name=f'요리: {recipe} x{count}',
+            make_worker=lambda r=recipe, n=count: RecipeCookingWorker(r, n))
+    for recipe in RECIPES for count in (10, 50)
+)
+JOB_CATALOG.extend(
+    JobSpec(key=f'equipment_{recipe}', name=f'제작: {recipe} x3',
+            make_worker=lambda r=recipe: EquipmentCraftWorker(r))
+    for recipe in EQUIPMENT_RECIPES
 )
 JOB_CATALOG_BY_KEY: dict[str, JobSpec] = {spec.key: spec for spec in JOB_CATALOG}
 

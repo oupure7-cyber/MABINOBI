@@ -1,0 +1,254 @@
+{
+  "황금 개암 버섯": {
+    "name": "황금 개암 버섯",
+    "file": "Gatherable_Gold_KuritakeMushroom.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_KuritakeMushroom.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 달걀": {
+    "name": "황금 달걀",
+    "file": "Gatherable_Gold_Egg.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_Egg.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 거미줄": {
+    "name": "황금 거미줄",
+    "file": "Gatherable_Gold_Cobweb.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_Cobweb.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 네잎클로버": {
+    "name": "황금 네잎클로버",
+    "file": "Gatherable_Gold_Clover.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_Clover.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 우유": {
+    "name": "황금 우유",
+    "file": "Gatherable_Gold_BottleMilk.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_BottleMilk.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 사과": {
+    "name": "황금 사과",
+    "file": "Gatherable_Gold_Apple.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_Apple.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 나뭇가지": {
+    "name": "황금 나뭇가지",
+    "file": "Gatherable_Gold_Twig.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_Twig.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 헤이즐넛": {
+    "name": "황금 헤이즐넛",
+    "file": "Gatherable_Gold_Hazelnut.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_Hazelnut.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 거미줄+": {
+    "name": "황금 거미줄+",
+    "file": "Gatherable_Gold_Cobweb.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_Cobweb.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "단단한 통나무": {
+    "name": "단단한 통나무",
+    "file": "Gatherable_Wood_LogHardFurniture.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Wood_LogHardFurniture.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 풍뎅이": {
+    "name": "황금 풍뎅이",
+    "file": "Gatherable_InsectBeetleGold.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_InsectBeetleGold.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "부드러운 통나무": {
+    "name": "부드러운 통나무",
+    "file": "Gatherable_Wood_LogSoftFurniture.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Wood_LogSoftFurniture.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "벼락 맞은 나뭇가지": {
+    "name": "벼락 맞은 나뭇가지",
+    "file": "Item_Twig_LightningStrike.png",
+    "url": "https://cdn.mabimobi.life/image/item/Item_Twig_LightningStrike.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 부스러기": {
+    "name": "황금 부스러기",
+    "file": "Gatherable_Gold_Stone.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_Stone.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "마력 깃든 돌": {
+    "name": "마력 깃든 돌",
+    "file": "Gatherable_Ore_OreStoneFilledMana.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Ore_OreStoneFilledMana.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "반짝이는 이끼": {
+    "name": "반짝이는 이끼",
+    "file": "Gatherable_Herb_HerbShinyMoss.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Herb_HerbShinyMoss.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 이끼": {
+    "name": "황금 이끼",
+    "file": "Gatherable_Gold_Moss.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_Moss.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 양털": {
+    "name": "황금 양털",
+    "file": "Gatherable_Gold_Wool.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_Wool.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "두꺼운 양털": {
+    "name": "두꺼운 양털",
+    "file": "Gatherable_Cloth_WoolSoft.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Cloth_WoolSoft.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 양털+": {
+    "name": "황금 양털+",
+    "file": "Gatherable_Gold_Wool.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_Wool.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 줄기": {
+    "name": "황금 줄기",
+    "file": "Gatherable_Gold_GrainLongStem.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Gold_GrainLongStem.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "묵직한 감자": {
+    "name": "묵직한 감자",
+    "file": "Gatherable_Food_VegetablePotato.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Food_VegetablePotato.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 나비": {
+    "name": "황금 나비",
+    "file": "Gatherable_InsectButterflyGold.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_InsectButterflyGold.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 잠자리": {
+    "name": "황금 잠자리",
+    "file": "Gatherable_InsectDragonflyGold.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_InsectDragonflyGold.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "황금 사슴벌레": {
+    "name": "황금 사슴벌레",
+    "file": "Gatherable_InsectStagBeetleGold.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_InsectStagBeetleGold.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "야채볶음": {
+    "name": "야채볶음",
+    "file": "Food_FriedVegetables.png",
+    "url": "https://cdn.mabimobi.life/image/item/Food_FriedVegetables.png",
+    "source_page": "https://mabimobi.life/market"
+  },
+  "강철괴": {
+    "name": "강철괴",
+    "file": "Altered_Ore_BarSteel.png",
+    "url": "https://cdn.mabimobi.life/image/item/Altered_Ore_BarSteel.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "철괴": {
+    "name": "철괴",
+    "file": "Altered_Ore_BarIron.png",
+    "url": "https://cdn.mabimobi.life/image/item/Altered_Ore_BarIron.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "석탄": {
+    "name": "석탄",
+    "file": "Gatherable_Ore_OreCoal.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Ore_OreCoal.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "철 광석": {
+    "name": "철 광석",
+    "file": "Gatherable_Ore_OreIron.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Ore_OreIron.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "광석": {
+    "name": "광석",
+    "file": "Gatherable_Ore_Ore.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Ore_Ore.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "목재+": {
+    "name": "목재+",
+    "file": "Gatherable_Wood_WoodReinforced.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Wood_WoodReinforced.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "목재": {
+    "name": "목재",
+    "file": "Gatherable_Wood_Wood.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Wood_Wood.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "나무 진액": {
+    "name": "나무 진액",
+    "file": "Gatherable_Wood_Resin.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Wood_Resin.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "통나무": {
+    "name": "통나무",
+    "file": "Gatherable_Wood_Log.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Wood_Log.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "옷감+": {
+    "name": "옷감+",
+    "file": "Altered_Cloth_ClothReinforcedCloth.png",
+    "url": "https://cdn.mabimobi.life/image/item/Altered_Cloth_ClothReinforcedCloth.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "옷감": {
+    "name": "옷감",
+    "file": "Altered_Cloth_ClothCloth.png",
+    "url": "https://cdn.mabimobi.life/image/item/Altered_Cloth_ClothCloth.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "양털": {
+    "name": "양털",
+    "file": "Gatherable_Cloth_Wool.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Cloth_Wool.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "가죽+": {
+    "name": "가죽+",
+    "file": "Gatherable_Cloth_LeatherProcessedHardened.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Cloth_LeatherProcessedHardened.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "가죽": {
+    "name": "가죽",
+    "file": "Gatherable_Cloth_LeatherProcessed.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Cloth_LeatherProcessed.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "타닌 가루": {
+    "name": "타닌 가루",
+    "file": "Gatherable_Food_TanninPowder.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Food_TanninPowder.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  },
+  "생가죽": {
+    "name": "생가죽",
+    "file": "Gatherable_Cloth_Leather.png",
+    "url": "https://cdn.mabimobi.life/image/item/Gatherable_Cloth_Leather.png",
+    "source_page": "https://mabimobi.life/archive/items"
+  }
+}
