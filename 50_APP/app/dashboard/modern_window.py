@@ -356,7 +356,6 @@ class DashboardWindow(LegacyWindow):
         self.connection_toggle = ToggleSwitch(); self.connection_toggle.toggled.connect(self._on_toggle)
         toolbar.addWidget(self.connection_toggle)
         toolbar.addWidget(button('새로고침', self.refresh_all))
-        toolbar.addWidget(button('설치 마법사', self.open_wizard))
         toolbar.addWidget(button('사용 가이드', self.open_guide))
         outer.addLayout(toolbar)
         self.tabs = QTabWidget(); outer.addWidget(self.tabs, 1)
