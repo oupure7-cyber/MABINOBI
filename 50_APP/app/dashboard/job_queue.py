@@ -134,11 +134,38 @@ JOB_CATALOG.extend(
     for recipe in RECIPES for count in (10, 50)
 )
 JOB_CATALOG.extend(
-    JobSpec(key=f'equipment_{recipe}', name=f'제작: {recipe} x3',
+    JobSpec(key=f'equipment_{recipe}', name=f'제작: {recipe} x2',
             make_worker=lambda r=recipe: EquipmentCraftWorker(r))
     for recipe in EQUIPMENT_RECIPES
 )
 JOB_CATALOG_BY_KEY: dict[str, JobSpec] = {spec.key: spec for spec in JOB_CATALOG}
+
+# Hidden equipment variants for the 제작 tab's "주간 제작(마을)" buttons - deliberately
+# NOT added to JOB_CATALOG, so they never show up in the searchable catalog list.
+#
+# 임무 게시판은 같은 스크롤을 한 주에 최대 3개까지 팔아서(user, 2026-09-20), a week's
+# worth is 3 scrolls x 2 equipment each = 6, not the plain x2 catalog job's single-scroll
+# target - EQUIPMENT_WEEKLY_X6 backs the "주간 제작(마을)" button.
+#
+# EQUIPMENT_WEEKLY_X10 batches 5 scrolls (10) into as few execute_crafting calls as the
+# facility allows instead of running the x2 job 5 times over. The "주간 제작(마을) x5"
+# button reaches its 15-equipment target by queuing this x10 job *and* the new x5 job
+# below together (5 -> 10 + 5 = 15), reusing x10 rather than adding a fourth (x15) variant.
+EQUIPMENT_WEEKLY_X6: dict[str, JobSpec] = {
+    recipe: JobSpec(key=f'equipment_x6_{recipe}', name=f'제작: {recipe} x6',
+                     make_worker=lambda r=recipe: EquipmentCraftWorker(r, count=6))
+    for recipe in EQUIPMENT_RECIPES
+}
+EQUIPMENT_WEEKLY_X10: dict[str, JobSpec] = {
+    recipe: JobSpec(key=f'equipment_x10_{recipe}', name=f'제작: {recipe} x10',
+                     make_worker=lambda r=recipe: EquipmentCraftWorker(r, count=10))
+    for recipe in EQUIPMENT_RECIPES
+}
+EQUIPMENT_WEEKLY_X5: dict[str, JobSpec] = {
+    recipe: JobSpec(key=f'equipment_x5_{recipe}', name=f'제작: {recipe} x5',
+                     make_worker=lambda r=recipe: EquipmentCraftWorker(r, count=5))
+    for recipe in EQUIPMENT_RECIPES
+}
 
 
 @dataclass

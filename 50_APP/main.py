@@ -10,9 +10,11 @@ Also the entry point PyInstaller builds the standalone 마비노비.exe from dir
 exe: no system Python, no project folder alongside it). PROJECT_ROOT has to account for both
 cases: when frozen, __file__ doesn't point anywhere meaningful on disk (PyInstaller extracts
 into a temp dir), so it's derived from sys.executable's own location (wherever the user put
-the exe) instead. 그 project_root는 "사용 가이드" 버튼(10_RESEARCH 참조) 전용이라, 순수 단독
-exe로 배포된 경우 그 폴더가 없으면 해당 버튼만 "못 찾음"으로 우아하게 실패한다 - 대시보드 핵심
-기능(스탯/재화/가공 무한/JOB 대기열/음악)엔 영향 없음.
+the exe) instead - it's also where character_data/와 cli_settings.json이 exe와 나란히 저장돼서,
+자동 업데이트로 exe 파일만 교체돼도(app/updater.py) 그대로 남는다.
+
+ensure_cli_path()가 시작 시 MabinogiMobile_CLI.exe를 못 찾으면 설치 폴더를 직접 고르게 하고
+그 경로를 저장한다(app/dashboard/cli_setup.py) - 넥슨 기본 경로에 설치하지 않은 사용자 대응.
 """
 
 import sys
@@ -23,6 +25,7 @@ from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
 from app.dashboard.modern_window import DashboardWindow
+from app.dashboard.cli_setup import ensure_cli_path
 
 if getattr(sys, "frozen", False):
     PROJECT_ROOT = Path(sys.executable).resolve().parent
@@ -73,6 +76,8 @@ def main() -> int:
     self_test = '--ui-self-test' in sys.argv
     output = Path(sys.argv[sys.argv.index('--ui-self-test') + 1]) if self_test else None
     test_settings = QSettings(str(output.with_suffix('.ini')), QSettings.IniFormat) if self_test else None
+    if not self_test:
+        ensure_cli_path(PROJECT_ROOT)
     dashboard = DashboardWindow(PROJECT_ROOT, connect_on_start=not self_test, settings=test_settings)
     dashboard.show()
 

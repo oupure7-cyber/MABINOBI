@@ -15,7 +15,7 @@ import time
 from PySide6.QtCore import QThread, Signal
 from ..cli_client import run_cli
 from .recipe_variants import choose_recipe_variant, distinct_recipe_variants
-from .altering_routine import CHAINS, QUEUE_CAPACITY
+from .altering_routine import FAMILIES, QUEUE_CAPACITY
 
 
 class CraftingError(RuntimeError):
@@ -26,7 +26,7 @@ class _Paused(Exception):
     pass
 
 
-# Exact output/recipe relationships documented in altering_routine.CHAINS.
+# Exact output/recipe relationships documented in altering_routine.FAMILIES.
 # Never infer output names by stripping parentheses from arbitrary recipes.
 ALTERING_RECIPES = {"철괴": ("철괴(철 광석)", "철괴(광석)")}
 REASONS = {
@@ -313,9 +313,9 @@ class CraftingWorker(QThread):
         observed = self.checkpoint.setdefault("facilities", {}).get(recipe)
         if observed:
             return observed
-        for chain in CHAINS:
-            if recipe in (chain.end_product, *(path.recipe for path in chain.paths)):
-                return chain.facility
+        for family in FAMILIES:
+            if any(recipe == option.display_name for tier in family.tiers for option in tier.recipes):
+                return family.facility
         return None
 
     def _learn_facilities(self, works):

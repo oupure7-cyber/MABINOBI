@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest.mock import patch
 from app.dashboard.recipe_cooking import RecipeCookingWorker, CookingError, RECIPES
@@ -42,9 +43,48 @@ class CookingTests(unittest.TestCase):
     def test_failure_preserves_remaining_after_completed_batches(self):
         w = RecipeCookingWorker('호박 수프', 10); messages=[]
         w.blocked.connect(messages.append)
-        with patch.object(w, 'craft_one', side_effect=[2, CookingError('재료 부족')]): w.run()
+        recipe_row = {'DisplayName': w.recipe, 'ProducedPerCraft': 2, 'Craftable': True}
+        responses = [
+            {'error': 'invalid_count', 'maxCount': 1},  # facility caps this recipe at 1 per call
+            {'status': 'accepted', 'result': 'completed'},  # produces 2 (ProducedPerCraft)
+            {'error': '재료 부족'},
+        ]
+        with patch.object(w, 'recipe_info', return_value=recipe_row), \
+             patch('app.dashboard.recipe_cooking.run_cli', side_effect=responses):
+            w.run()
         self.assertEqual(w.remaining, 8)
         self.assertEqual(messages, ['재료 부족'])
+
+    def test_evenly_divisible_target_uses_a_single_batched_call(self):
+        """The economization this exists for: N separate craftCount=1 calls each cost
+        정령의 날개 regardless of craftCount, so batching into one call is strictly
+        cheaper whenever the target is a clean multiple of ProducedPerCraft (user
+        request, 2026-09-20)."""
+        w = RecipeCookingWorker('호박 수프', 10)
+        recipe_row = {'DisplayName': w.recipe, 'ProducedPerCraft': 2, 'Craftable': True}
+        with patch.object(w, 'recipe_info', return_value=recipe_row), \
+             patch('app.dashboard.recipe_cooking.run_cli', return_value={'status': 'accepted', 'result': 'completed'}) as cli:
+            w.run()
+        self.assertEqual(w.remaining, 0)
+        cli.assert_called_once()
+        self.assertEqual(json.loads(cli.call_args.args[1])['craftCount'], 5)
+
+    def test_facility_cap_is_learned_once_and_reused_across_later_calls(self):
+        w = RecipeCookingWorker('호박 수프', 10)
+        recipe_row = {'DisplayName': w.recipe, 'ProducedPerCraft': 1, 'Craftable': True}
+        responses = [
+            {'error': 'invalid_count', 'maxCount': 4},
+            {'status': 'accepted', 'result': 'completed'},
+            {'status': 'accepted', 'result': 'completed'},
+            {'status': 'accepted', 'result': 'completed'},
+        ]
+        with patch.object(w, 'recipe_info', return_value=recipe_row), \
+             patch('app.dashboard.recipe_cooking.run_cli', side_effect=responses) as cli:
+            w.run()
+        self.assertEqual(w.remaining, 0)
+        self.assertEqual(cli.call_count, 4)
+        craft_counts = [json.loads(call.args[1])['craftCount'] for call in cli.call_args_list]
+        self.assertEqual(craft_counts, [10, 4, 4, 2])
 
     def test_stopped_craft_is_not_success(self):
         w = RecipeCookingWorker('호박 수프', 10)

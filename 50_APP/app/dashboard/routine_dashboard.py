@@ -1,4 +1,4 @@
-"""Compact read-only view of the infinite workshop worker's snapshots.
+"""Compact N-tier workshop controls and a read-only view of worker snapshots.
 
 Inventory includes both storage locations. This view never calls the game CLI.
 """
@@ -7,22 +7,26 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (
-    QHeaderView, QHBoxLayout, QLabel, QSizePolicy, QTableWidget,
+    QGroupBox, QHeaderView, QHBoxLayout, QLabel, QScrollArea, QSizePolicy, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
-from .altering_routine import CHAINS, QUEUE_CAPACITY, AlteringRoutineWorker
+from .altering_routine import FAMILIES, QUEUE_CAPACITY, AlteringRoutineWorker
+from .tier_target_control import TierTargetControl
 from .item_icons import item_icon
 
 
 def _ordered_material_names() -> list[str]:
     """Keep a product next to its intermediate and raw materials."""
     names: list[str] = []
-    for chain in CHAINS:
-        for name in (chain.end_product, chain.intermediate,
-                     chain.end_direct_material, *[p.raw_material for p in chain.paths]):
-            if name not in names:
-                names.append(name)
+    for family in FAMILIES:
+        # All seven tiers remain inspectable without inflating the panel: the
+        # bounded table scrolls, with each family in production order.
+        for tier in family.tiers:
+            for name in (tier.name, *(ingredient.material for option in tier.recipes
+                                      for ingredient in option.inputs)):
+                if name not in names:
+                    names.append(name)
     return names
 
 
@@ -65,7 +69,7 @@ class RoutineDashboard(QWidget):
         super().__init__(parent, Qt.Window)
         self.setWindowTitle('무한가공소 현황')
         self.setAttribute(Qt.WA_DeleteOnClose, True)
-        self.resize(640, 480)
+        self.resize(680, 720)
         self._blocked = False
         self._material_names = _ordered_material_names()
         self._material_row: dict[str, int] = {}
@@ -73,6 +77,9 @@ class RoutineDashboard(QWidget):
         self._queue_slots: dict[str, FacilitySlots] = {}
         self._queue_label: dict[str, QLabel] = {}
         self._queue_count: dict[str, QLabel] = {}
+        self._queue_icons: dict[str, QLabel] = {}
+        self._controls: dict[str, TierTargetControl] = {}
+        self._target_worker: AlteringRoutineWorker | None = None
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 8, 0, 0)
@@ -87,6 +94,18 @@ class RoutineDashboard(QWidget):
         content = QVBoxLayout(self._content)
         content.setContentsMargins(0, 0, 0, 0)
         content.setSpacing(7)
+        targets_box = QGroupBox('목표 등급 설정')
+        targets_box.setStyleSheet('QGroupBox { font-size: 12px; } QLabel { font-size: 12px; }')
+        targets_layout = QVBoxLayout(targets_box)
+        targets_layout.setContentsMargins(8, 12, 8, 6)
+        targets_layout.setSpacing(3)
+        for family in FAMILIES:
+            control = TierTargetControl(family)
+            control.target_changed.connect(self._on_target_changed(family.key))
+            targets_layout.addWidget(control)
+            self._controls[family.key] = control
+        content.addWidget(targets_box)
+
         heading = QHBoxLayout()
         heading.addWidget(QLabel('재료 · 생산물'))
         caption = QLabel('가방 + 캐릭터 · 계정 창고 합계')
@@ -117,7 +136,7 @@ class RoutineDashboard(QWidget):
         table.setStyleSheet('QTableWidget::item { padding: 2px 5px; font-size: 12px; } QHeaderView::section { padding: 4px 5px; font-size: 11px; }')
         table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         table.setMinimumHeight(135)
-        table.setMaximumHeight(27 * (rows + 1) + 3)
+        table.setMaximumHeight(min(27 * (rows + 1) + 3, 192))
         for index, name in enumerate(self._material_names):
             row, column = index % rows, (index // rows) * 2
             title = QTableWidgetItem(item_icon(name), name)
@@ -140,7 +159,7 @@ class RoutineDashboard(QWidget):
         facilities_header.addWidget(legend)
         content.addLayout(facilities_header)
 
-        for chain in CHAINS:
+        for family in FAMILIES:
             row_widget = QWidget()
             row_widget.setFixedHeight(31)
             row_widget.setStyleSheet('QWidget { background: #17272d; border-radius: 3px; } QLabel { background: transparent; font-size: 12px; }')
@@ -149,10 +168,10 @@ class RoutineDashboard(QWidget):
             row.setSpacing(7)
             icon = QLabel()
             icon.setFixedSize(20, 20)
-            icon.setPixmap(item_icon(chain.end_product).pixmap(20, 20))
-            name = QLabel(chain.label)
+            icon.setPixmap(item_icon(family.tiers[family.default_target_idx].name).pixmap(20, 20))
+            name = QLabel(family.label)
             name.setMinimumWidth(48)
-            name.setToolTip(chain.facility)
+            name.setToolTip(family.facility)
             slots = FacilitySlots()
             count = QLabel('— / 7')
             count.setMinimumWidth(37)
@@ -166,17 +185,42 @@ class RoutineDashboard(QWidget):
             row.addWidget(slots)
             row.addWidget(count)
             row.addWidget(status, 1)
-            self._queue_slots[chain.key] = slots
-            self._queue_label[chain.key] = status
-            self._queue_count[chain.key] = count
+            self._queue_icons[family.key] = icon
+            self._queue_slots[family.key] = slots
+            self._queue_label[family.key] = status
+            self._queue_count[family.key] = count
             content.addWidget(row_widget)
 
-        outer.addWidget(self._content, 1)
+        content.addStretch(1)
+        self._scroll = QScrollArea()
+        self._scroll.setFrameShape(QScrollArea.NoFrame)
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._scroll.setMinimumHeight(160)
+        self._scroll.setWidget(self._content)
+        outer.addWidget(self._scroll, 1)
 
     def attach(self, worker: AlteringRoutineWorker) -> None:
         worker.snapshot.connect(self._on_snapshot)
         worker.blocked.connect(self._on_blocked)
         worker.stopped.connect(self._on_stopped)
+        self.wire_targets(worker)
+
+    def wire_targets(self, worker: AlteringRoutineWorker) -> None:
+        """Use current targets for this worker; future drags reach only this one."""
+        self._target_worker = worker
+        for family_key, control in self._controls.items():
+            worker.set_target(family_key, control.value())
+
+    def _on_target_changed(self, family_key: str):
+        def handler(idx: int) -> None:
+            family = next(family for family in FAMILIES if family.key == family_key)
+            icon = self._queue_icons.get(family_key)
+            if icon is not None:
+                icon.setPixmap(item_icon(family.tiers[idx].name).pixmap(20, 20))
+            if self._target_worker is not None:
+                self._target_worker.set_target(family_key, idx)
+        return handler
 
     def _on_snapshot(self, snap: dict) -> None:
         if self._blocked:

@@ -54,6 +54,51 @@ class CraftingUITests(unittest.TestCase):
         self.window.toggle_overlay(False)
         self.assertFalse(self.window.overlay.enabled)
         self.assertEqual(self.window.overlay.width(),240)
+
+    def test_toolbar_and_queue_options_control_one_borderless_overlay(self):
+        self.window.overlay_button.setChecked(False)
+        self.assertFalse(self.window.overlay_toggle.isChecked())
+        self.assertFalse(self.window.overlay.enabled)
+        self.assertFalse(self.window.environment_overlay.enabled)
+        self.window.overlay_toggle.setChecked(True)
+        self.assertTrue(self.window.overlay_button.isChecked())
+        self.assertTrue(self.window.overlay.enabled)
+        self.assertTrue(self.window.environment_overlay.enabled)
+        self.assertFalse(self.window.environment_overlay.polling_allowed)
+        self.assertFalse(hasattr(self.window, 'overlay_manager'))
+
+    def test_scroll_jobs_still_resolve_after_live_catalogue_replaces_equipment_rows(self):
+        self.window.apply_recipes({'items':[{'DisplayName':'검증 항목','ProducedPerCraft':1,'Craftable':True}]})
+        self.assertFalse(any(spec.key.startswith('equipment_') for spec in self.window.specs))
+        self.window._on_scrolls_loaded([{'DisplayName':'제작 스크롤: 크레센트 엣지소드',
+                                        'Count':3, 'Location':'inventory'}])
+        [job] = self.window.queue.jobs
+        self.assertEqual(job.spec.make_worker().recipe, '크레센트 엣지소드')
+        self.assertEqual(job.spec.make_worker().remaining, 2)
+        self.assertEqual(job.repeats, 3)
+
+    def test_workshop_overlay_uses_current_upstream_family_target(self):
+        from app.dashboard.altering_routine import FAMILIES
+        metal = next(family for family in FAMILIES if family.key == 'metal')
+        self.window.routine._controls['metal']._slider.setValue(0)
+        self.window.queue.on_routine_snapshot({'queue':{'metal':7}, 'queue_completed':{'metal':2}})
+        [row] = [entry for entry in self.window.queue.last_progress['materials']
+                 if entry['name'] == metal.tiers[0].name]
+        self.assertEqual((row['owned'], row['required']), (2,7))
+
+    def test_environment_request_is_included_in_busy_and_close_guards(self):
+        from unittest.mock import Mock
+        worker = Mock()
+        worker.isRunning.return_value = True
+        self.window.environment_overlay.worker = worker
+        try:
+            self.assertTrue(self.window.query_busy())
+            event = QCloseEvent()
+            self.window.closeEvent(event)
+            self.assertFalse(event.isAccepted())
+            self.assertFalse(self.window.environment_overlay.enabled)
+        finally:
+            self.window.environment_overlay.worker = None
     def test_duplicate_recipe_is_not_silently_discarded(self):
         rows = parse_recipes({'items':[
             {'DisplayName':'최상급 붕대','ProducedPerCraft':10,'Craftable':True},

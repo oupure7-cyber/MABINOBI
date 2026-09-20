@@ -6,14 +6,16 @@ import json
 from copy import deepcopy
 from dataclasses import replace
 from PySide6.QtCore import Qt, QSettings, QTimer, QThread, Signal, QSize
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+from PySide6.QtGui import QCursor
+from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QTabWidget, QButtonGroup, QTableWidget, QTableWidgetItem, QHeaderView,
     QSplitter, QFrame, QGridLayout, QScrollArea, QPlainTextEdit, QComboBox, QMessageBox,
     QSpinBox, QCheckBox, QSlider)
 
 from .main_window import DashboardWindow as LegacyWindow, TopStatsPanel
 from .widgets import CurrencyColumn, Toast, ToggleSwitch, HIDDEN_CURRENCY_NAMES, classify_cli_result
-from .job_queue import JOB_CATALOG, JobSpec, QueuedJob
+from .job_queue import JOB_CATALOG, JobSpec, QueuedJob, EQUIPMENT_WEEKLY_X6, EQUIPMENT_WEEKLY_X10, EQUIPMENT_WEEKLY_X5
+from .equipment_crafting import TOWN_EQUIPMENT
 from .altering_routine import AlteringRoutineWorker
 from .routine_dashboard import RoutineDashboard
 from .music_panel import MusicPanel
@@ -25,54 +27,13 @@ from .crafting_catalog import (RecipeCatalogWorker, parse_recipes, recipe_state,
 from .crafting_detail import CraftingDetail
 from .crafting_engine import CraftingWorker
 from .progress_overlay import ProgressOverlay
+from .overlay import EnvironmentOverlayController
 
-STYLE = """
-QWidget { background: #121e23; color: #e4e9eb; font-family: 'Malgun Gothic'; font-size: 14px; }
-QMainWindow { background: #121e23; }
-QLabel { background: transparent; }
-QLabel[heading="true"] { font-size: 19px; font-weight: 700; padding: 6px 0; }
-QPushButton { background: #19292f; border: 1px solid #3a5059; border-radius: 4px; padding: 6px 12px; }
-QPushButton:hover { background: #253b42; border-color: #6a9186; }
-QPushButton:checked { color: #90dcb5; background: #1c3a32; border-color: #69b18c; }
-QPushButton:disabled { color: #6b7a80; border-color: #293a41; }
-QTableWidget QPushButton { padding: 3px; }
-QTableWidget::item { border-bottom: 1px solid #293b43; padding: 4px; }
-QLineEdit, QComboBox { background: #101b20; border: 1px solid #3a5059; border-radius: 4px; padding: 7px; }
-QTableWidget, QListWidget, QPlainTextEdit { background: #121e23; border: 1px solid #293b43; gridline-color: #293b43; selection-background-color: #24483c; }
-QListWidget::item { padding: 8px; border-bottom: 1px solid #293b43; }
-QHeaderView::section { background: #20313a; color: #bdcbd0; border: none; padding: 7px; }
-QTabWidget::pane { border: none; border-top: 1px solid #33484e; }
-QTabBar::tab { padding: 12px 27px; color: #bbc6cb; border-bottom: 3px solid transparent; }
-QTabBar::tab:selected { color: #8bd8ae; border-bottom: 3px solid #8bd8ae; }
-QScrollBar:vertical { background: #132027; width: 9px; }
-QScrollBar::handle:vertical { background: #39515a; min-height: 25px; }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-QFrame#infoPanel { border: 1px solid #54706f; background: #17272d; }
-QSplitter::handle { background: #30454c; width: 1px; }
-"""
-
-def heading(text):
-    label = QLabel(text)
-    label.setProperty('heading', True)
-    return label
-
-def button(text, callback):
-    b = QPushButton(text)
-    b.clicked.connect(callback)
-    return b
-
-def table(headers, widget_class=QTableWidget):
-    t = widget_class(0, len(headers))
-    t.setIconSize(QSize(26, 26))
-    t.setHorizontalHeaderLabels(headers)
-    t.verticalHeader().hide()
-    t.setEditTriggers(QTableWidget.NoEditTriggers)
-    t.setSelectionBehavior(QTableWidget.SelectRows)
-    t.setShowGrid(False)
-    t.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-    t.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-    t.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-    return t
+from .character_watcher import CharacterWatcher
+from .character_manager import CharacterManagerDialog
+from .storage_search import StorageSearchPanel
+from .. import character_profiles
+from .ui_kit import STYLE, heading, button, table
 
 def kind(spec):
     if spec.key.startswith('craft:'): return '제작'
@@ -85,7 +46,13 @@ def title(spec):
 
 def quantity(spec, repeats=1):
     if getattr(spec, 'target_count', 0): return f'목표 {spec.target_count * repeats:,}개'
-    if kind(spec) == '제작': return f'목표 {3 * repeats:,}개'
+    if kind(spec) == '제작':
+        # Ask a freshly-constructed (never-started) worker for its own real target
+        # instead of hardcoding per-variant numbers here - stays correct automatically
+        # as new hidden x6/x10/x5-style variants are added (they all set
+        # RecipeCookingWorker.remaining in __init__, before any CLI call happens).
+        base = spec.make_worker().remaining
+        return f'목표 {base * repeats:,}개'
     if kind(spec) == '채집':
         return f'최대 {100 * repeats:,}개'
     if kind(spec) == '요리':
@@ -97,6 +64,16 @@ class InfoWorker(QThread):
     result = Signal(object, object)
     def run(self):
         self.result.emit(run_cli('get_my_info'), run_cli('get_currencies'))
+
+
+SCROLL_PREFIX = '제작 스크롤: '  # 임무 게시판에서 사는 퀘스트 아이템 - 인벤토리에만 보관 가능(창고 불가)
+
+
+class ScrollInventoryWorker(QThread):
+    result = Signal(list)
+    def run(self):
+        data = run_cli('get_items', json.dumps({'name': SCROLL_PREFIX}, ensure_ascii=False))
+        self.result.emit(data if isinstance(data, list) else [])
 
 
 class WorkQueue(QWidget):
@@ -269,6 +246,7 @@ class WorkQueue(QWidget):
             self.worker.snapshot.connect(self.snapshot_target._on_snapshot)
             self.worker.snapshot.connect(self.on_routine_snapshot)
             self.worker.blocked.connect(self.snapshot_target._on_blocked)
+            self.snapshot_target.wire_targets(self.worker)
         self.render(); self.worker.start()
 
     def on_blocked(self, reason):
@@ -306,11 +284,16 @@ class WorkQueue(QWidget):
         self.progress.emit(self.last_progress)
 
     def on_routine_snapshot(self, data):
-        from .altering_routine import CHAINS, QUEUE_CAPACITY
-        rows = [{'name': c.end_product, 'owned': data.get('queue_completed', {}).get(c.key, 0),
-                 'required': data.get('queue', {}).get(c.key, 0),
-                 'state': f"시설 {data.get('queue', {}).get(c.key, 0)}/{QUEUE_CAPACITY} · 완료 {data.get('queue_completed', {}).get(c.key, 0)}"}
-                for c in CHAINS]
+        from .altering_routine import FAMILIES, QUEUE_CAPACITY
+        rows = []
+        for family in FAMILIES:
+            control = getattr(self.snapshot_target, '_controls', {}).get(family.key)
+            target = control.value() if control is not None else family.default_target_idx
+            tier = family.tiers[max(0, min(len(family.tiers) - 1, target))]
+            occupied = data.get('queue', {}).get(family.key, 0)
+            done = data.get('queue_completed', {}).get(family.key, 0)
+            rows.append({'name': tier.name, 'owned': done, 'required': occupied,
+                         'state': f'시설 {occupied}/{QUEUE_CAPACITY} · 완료 {done}'})
         self.on_progress({'recipe': '무한가공소', 'target': 0, 'completed': 0,
                           'stage': '가공', 'materials': rows, 'message': self.status.text()})
 
@@ -398,13 +381,15 @@ class DashboardWindow(LegacyWindow):
         QMainWindow.__init__(self)
         self.project_root = project_root
         self.setWindowTitle('마비노비')
-        self.resize(1500, 920); self.setMinimumSize(1100, 700)
+        self.setMinimumSize(1100, 700)
+        self._fit_to_active_screen()
         self.setStyleSheet(STYLE)
         self._connection_worker = None; self._guide_dialog = None; self.info_worker = None
         self.catalog_worker = None
         self.recipe_rows = reference_recipes(); self.catalog_counts = {}; self.catalog_loaded = False
         self.category_buttons = {}
         self.settings = settings if settings is not None else QSettings('MabiNobi', 'Workspace')
+        self._scroll_worker = None
         self.recent = self.settings.value('recent', [], type=list)
         self.category = '채집'; self.filter_mode = '전체'
         self.specs = [JobSpec(s.key, '무한가공소 · 1시간' if s.key == 'altering_1h' else s.name, s.make_worker) for s in JOB_CATALOG]
@@ -421,13 +406,17 @@ class DashboardWindow(LegacyWindow):
         toolbar = QHBoxLayout()
         self.character_btn = button('캐릭터 정보 ▾', self.toggle_info)
         toolbar.addWidget(self.character_btn)
+        self.active_character_label = QLabel(''); toolbar.addWidget(self.active_character_label)
         self.wings = QLabel('정령의 날개  —'); toolbar.addWidget(self.wings)
         toolbar.addWidget(button('주요 재화 ▾', self.show_currencies)); toolbar.addStretch()
         toolbar.addWidget(QLabel('게임 연결'))
         self.connection_toggle = ToggleSwitch(); self.connection_toggle.toggled.connect(self._on_toggle)
         toolbar.addWidget(self.connection_toggle)
         toolbar.addWidget(button('새로고침', self.refresh_all))
-        toolbar.addWidget(button('사용 가이드', self.open_guide))
+        self.overlay_button = QPushButton('오버레이'); self.overlay_button.setCheckable(True)
+        self.overlay_button.toggled.connect(self._on_overlay_toggled)
+        toolbar.addWidget(self.overlay_button)
+        toolbar.addWidget(button('캐릭터 관리', self.open_character_manager))
         outer.addLayout(toolbar)
         self.tabs = QTabWidget(); outer.addWidget(self.tabs, 1)
         work = QWidget(); w = QHBoxLayout(work); w.setContentsMargins(0, 12, 0, 0)
@@ -440,6 +429,18 @@ class DashboardWindow(LegacyWindow):
             group.addButton(b); cats.addWidget(b)
             self.category_buttons[name] = b
         cats.addStretch(); lv.addLayout(cats)
+        self.equipment_buttons = QWidget(); eqv = QVBoxLayout(self.equipment_buttons)
+        eqv.setContentsMargins(0, 0, 0, 6); eqv.setSpacing(6)
+        eqv.addWidget(button('보유 스크롤 모두 진행', self.craft_all_owned_scrolls))
+        weekly = QHBoxLayout()
+        for town in TOWN_EQUIPMENT:
+            weekly.addWidget(button(f'주간 제작({town})', lambda _, t=town: self.add_weekly_equipment(t, 1)))
+        eqv.addLayout(weekly)
+        weekly_x5 = QHBoxLayout()
+        for town in TOWN_EQUIPMENT:
+            weekly_x5.addWidget(button(f'주간 제작({town}) x5', lambda _, t=town: self.add_weekly_equipment(t, 5)))
+        eqv.addLayout(weekly_x5)
+        lv.addWidget(self.equipment_buttons); self.equipment_buttons.hide()
         search = QHBoxLayout(); self.search = QLineEdit(); self.search.setPlaceholderText('재료 또는 작업 이름 검색')
         self.search.textChanged.connect(self.render_catalog); search.addWidget(self.search, 1)
         filters = QButtonGroup(self)
@@ -473,24 +474,71 @@ class DashboardWindow(LegacyWindow):
         self.queue.activity_guard = lambda: self.music_panel._current_title is not None or self.query_busy()
         self.overlay = ProgressOverlay(self.settings, self)
         self.overlay.set_enabled(False)
+        self.environment_overlay = EnvironmentOverlayController(
+            self.overlay._game, self, polling_allowed=connect_on_start)
+        self.environment_overlay.set_opacity(self.overlay.element_opacity)
         self.queue.progress.connect(self.update_progress)
         self.make_overlay_controls()
+        self.overlay_button.blockSignals(True)
+        self.overlay_button.setChecked(self.overlay_toggle.isChecked())
+        self.overlay_button.blockSignals(False)
+        self.storage_panel = StorageSearchPanel(self.project_root); self.tabs.addTab(self.storage_panel, '창고')
+        self.storage_panel.get_active_profile_id = lambda: self._active_profile_id
         self.music_status = QLabel(''); self.music_panel.layout().insertWidget(1, self.music_status)
         self.queue.changed.connect(lambda: self.music_status.setText(self.queue.current_label.text()))
         self.make_info_panel()
         self.toast = Toast(self)
         self.render_catalog()
+        self.character_watcher = None
+        self._active_profile_id = None
+        self._character_manager_dialog = None
         if connect_on_start:
             self._try_connect()
             self.overlay.set_enabled(self.overlay_toggle.isChecked())
+            self.environment_overlay.set_enabled(self.overlay_toggle.isChecked())
+            self.character_watcher = CharacterWatcher(self.project_root, parent=self)
+            self.character_watcher.profile_updated.connect(self._on_profile_updated)
+
+    def _on_overlay_toggled(self, checked):
+        self.toggle_overlay(checked)
+
+    def _on_connection_result(self, ok, _detail):
+        super()._on_connection_result(ok, _detail)
+        self.overlay.set_enabled(bool(ok) and self.overlay_toggle.isChecked())
+        self.environment_overlay.set_enabled(bool(ok) and self.overlay_toggle.isChecked())
+
+    def _on_profile_updated(self, profile, all_profiles):
+        self._active_profile_id = profile['profile_id']
+        self.active_character_label.setText(character_profiles.display_name(profile))
+        self.storage_panel.render_results()
+
+    def refresh_active_character_label(self):
+        """Re-render the toolbar label from disk - e.g. after a rename/delete in 캐릭터 관리."""
+        if self._active_profile_id is None:
+            return
+        profiles = character_profiles.load_profiles(self.project_root)
+        current = next((p for p in profiles if p['profile_id'] == self._active_profile_id), None)
+        self.active_character_label.setText(character_profiles.display_name(current) if current else '')
+
+    def open_character_manager(self):
+        if self._character_manager_dialog is None:
+            self._character_manager_dialog = CharacterManagerDialog(self.project_root, self)
+            self._character_manager_dialog.changed.connect(self.refresh_active_character_label)
+        self._character_manager_dialog.refresh()
+        self._character_manager_dialog.show()
+        self._character_manager_dialog.raise_()
+        self._character_manager_dialog.activateWindow()
 
     def select_category(self, name):
         if name in self.category_buttons: self.category_buttons[name].setChecked(True)
         self.category = name; self.render_catalog()
 
     def query_busy(self):
+        storage_worker = getattr(getattr(self, 'storage_panel', None), '_refresh_worker', None)
+        environment_worker = getattr(getattr(self, 'environment_overlay', None), 'worker', None)
         return any(w is not None and w.isRunning() for w in
-                   (self.catalog_worker, self.info_worker, self._connection_worker))
+                   (self.catalog_worker, self.info_worker, self._connection_worker,
+                    self._scroll_worker, storage_worker, environment_worker))
 
     def _try_connect(self):
         if self.query_busy() or self.queue.worker or self.music_panel._current_title:
@@ -525,7 +573,8 @@ class DashboardWindow(LegacyWindow):
                 step = produced if type(produced) is int and produced > 0 else 1
                 spin = QSpinBox(); spin.setRange(1, 9999); spin.setFixedHeight(28)
                 spin.setSingleStep(step)
-                spin.setValue(self.catalog_counts.get(spec.key, max(1, spec.target_count or 3)))
+                default = spec.target_count or (spec.make_worker().remaining if spec.key.startswith('equipment_') else 3)
+                spin.setValue(self.catalog_counts.get(spec.key, max(1, default)))
                 spin.setToolTip(f'최종 아이템 목표 수량 · 1회 {step}개 단위. 직접 입력하거나 위아래 화살표로 변경합니다.' if recipe and recipe.get('ProducedPerCraft') else '최종 아이템 목표 수량 · 게임에서 1회 생산량을 확인합니다.')
                 spin.setKeyboardTracking(False)
                 spin.valueChanged.connect(lambda n, k=spec.key: self.set_recipe_quantity(k, n))
@@ -543,6 +592,7 @@ class DashboardWindow(LegacyWindow):
         self.catalog.blockSignals(False)
         self.empty.setText('검색 결과가 없습니다.' if not specs else '')
         self.empty.setVisible(not specs)
+        self.equipment_buttons.setVisible(self.category == '제작')
         self.routine.setVisible(self.category == '무한가공소')
         self.craft_detail.setVisible(self.category == '제작' and isinstance(self.queue.worker, CraftingWorker))
         self.catalog_status.setVisible(self.category == '제작'); self.sync_button.setVisible(self.category == '제작')
@@ -552,12 +602,17 @@ class DashboardWindow(LegacyWindow):
         spec = next((s for s in self.specs if s.key == key), None)
         if spec is not None: self.add_job(spec)
 
-    def add_job(self, spec):
-        if spec.key.startswith(('craft:', 'equipment_')):
+    def add_job(self, spec, *, catalog_quantity=True):
+        if catalog_quantity and spec.key.startswith(('craft:', 'equipment_')):
             name = spec_item_name(spec)
-            amount = self.catalog_counts.get(spec.key, spec.target_count or 3)
+            default = spec.target_count or (spec.make_worker().remaining if spec.key.startswith('equipment_') else 3)
+            amount = self.catalog_counts.get(spec.key, default)
             spec = replace(spec, name=f'제작: {name}', target_count=amount, recipe_name=name,
                            make_worker=lambda r=name, n=amount: CraftingWorker(r, n))
+        elif spec.key.startswith('equipment_'):
+            # Weekly scroll batches retain their own worker and exact 6/10/5
+            # target. Their hidden key suffix must never become a recipe name.
+            spec = replace(spec, recipe_name=spec.make_worker().recipe)
         self.queue.add(spec)
         self.recent = [spec.key] + [k for k in self.recent if k != spec.key]
         self.settings.setValue('recent', self.recent[:30])
@@ -634,6 +689,7 @@ class DashboardWindow(LegacyWindow):
         self.overlay_lock.toggled.connect(self.overlay.set_locked)
         self.overlay_click.toggled.connect(self.overlay.set_click_through)
         self.overlay_opacity.valueChanged.connect(lambda v:self.overlay.set_opacity(v/100))
+        self.overlay_opacity.valueChanged.connect(lambda v:self.environment_overlay.set_opacity(v/100))
         preview = button('위치 미리보기', lambda: self.overlay.set_preview(not self.overlay._preview))
         preview.setToolTip('게임 연결 없이 오버레이 위치를 확인합니다. 위치 잠금을 해제하면 끌어 옮길 수 있습니다.')
         form.addWidget(preview)
@@ -642,6 +698,82 @@ class DashboardWindow(LegacyWindow):
     def toggle_overlay(self, enabled):
         self.settings.setValue('overlay/ui_enabled', enabled)
         self.overlay.set_enabled(enabled)
+        self.environment_overlay.set_enabled(enabled)
+        for control in (self.overlay_toggle, self.overlay_button):
+            control.blockSignals(True)
+            control.setChecked(enabled)
+            control.blockSignals(False)
+
+    def add_weekly_equipment(self, town, weeks):
+        """'주간 제작(마을)'/'x5' buttons - queue that town's 3 scroll recipes at once.
+
+        임무 게시판은 같은 스크롤을 한 주에 최대 3개까지 팔아서(user, 2026-09-20), 한 주 몫은
+        3 x 2(스크롤 하나당 장비 2개) = 6개 - 그래서 x2 카탈로그 잡이 아니라 숨은 x6 잡
+        (EQUIPMENT_WEEKLY_X6)을 쓴다. x5 버튼은 목표 15개를 새 x15 잡을 따로 만드는 대신
+        기존 x10 잡 + 새 x5 잡을 같이 큐에 넣어서 채운다(10+5=15, user 지정)."""
+        for recipe in TOWN_EQUIPMENT[town]:
+            if weeks == 5:
+                self.add_job(EQUIPMENT_WEEKLY_X10[recipe], catalog_quantity=False)
+                self.add_job(EQUIPMENT_WEEKLY_X5[recipe], catalog_quantity=False)
+            else:
+                self.add_job(EQUIPMENT_WEEKLY_X6[recipe], catalog_quantity=False)
+
+    def _find_equipment_spec(self, recipe_name):
+        """Match a scroll-derived recipe name to a catalog spec, tolerant of whitespace
+        differences - the live API is known to be inconsistent about spacing within an
+        item name (recipe_info() already normalizes for the same reason when matching
+        get_craftable_items)."""
+        target = ''.join(recipe_name.split()).casefold()
+        # The live crafting catalogue replaces browsing equipment rows. Scroll
+        # actions must still resolve their known two-item equipment workers.
+        for s in JOB_CATALOG:
+            if s.key.startswith('equipment_') and ''.join(s.key[len('equipment_'):].split()).casefold() == target:
+                return s
+        return None
+
+    def craft_all_owned_scrolls(self):
+        """'보유 스크롤 모두 진행' - 인벤토리의 "제작 스크롤: <이름>"을 전부 확인해서, 아는
+        레시피(EQUIPMENT_RECIPES)면 그 개수만큼 반복(◀N▶)으로 대기열에 추가한다. 스크롤은
+        창고(캐릭터창고/계정창고)엔 보관이 안 되는 아이템이라 인벤토리만 본다. 모르는
+        스크롤(아직 JOB으로 안 만든 다른 제작 종류)은 조용히 건너뛴다(user, 2026-09-20)."""
+        if self.query_busy() or self.queue.worker or self.music_panel._current_title:
+            self.toast.show_message('현재 요청이 끝난 뒤 스크롤을 확인해주세요.')
+            return
+        self.toast.show_message('보유 스크롤 확인 중...')
+        self._scroll_worker = ScrollInventoryWorker(self)
+        self._scroll_worker.result.connect(self._on_scrolls_loaded)
+        self._scroll_worker.start()
+
+    def _on_scrolls_loaded(self, items):
+        added = []
+        unknown = 0
+        for item in items:
+            name = item.get('DisplayName', '')
+            if item.get('Location') != 'inventory' or not name.startswith(SCROLL_PREFIX):
+                continue
+            recipe = name[len(SCROLL_PREFIX):]
+            spec = self._find_equipment_spec(recipe)
+            if spec is None:
+                unknown += 1
+                continue
+            count = item.get('Count', 0)
+            if count <= 0:
+                continue
+            repeats = max(1, min(9, count))
+            self.queue.jobs.append(QueuedJob(spec, repeats))
+            self.recent = [spec.key] + [k for k in self.recent if k != spec.key]
+            added.append(f'{title(spec)} x{repeats}')
+        if added:
+            self.settings.setValue('recent', self.recent[:30])
+            self.queue.render(); self.queue.start_next()
+            summary = ', '.join(added)
+            if unknown: summary += f' (모르는 스크롤 {unknown}종 제외)'
+            self.queue.message(f'스크롤 대기열 추가: {summary}')
+            self.toast.show_message(f'스크롤 {len(added)}종 대기열에 추가됨', 4000)
+        elif unknown:
+            self.toast.show_message(f'모르는 스크롤 {unknown}종만 있어 건너뛰었습니다.')
+        else:
+            self.toast.show_message('보유한 제작 스크롤이 없습니다.')
 
     def make_info_panel(self):
         self.info = QFrame(self.centralWidget()); self.info.setObjectName('infoPanel')
@@ -677,8 +809,7 @@ class DashboardWindow(LegacyWindow):
         menu.exec(self.sender().mapToGlobal(self.sender().rect().bottomLeft()))
 
     def refresh_all(self):
-        if self.catalog_worker and self.catalog_worker.isRunning(): return
-        if self.info_worker and self.info_worker.isRunning(): return
+        if self.query_busy(): return
         if self.queue.worker or self.music_panel._current_title:
             self.toast.show_message('현재 작업이 끝난 뒤 정보를 새로고침해주세요.'); return
         self.info_worker = InfoWorker(self); self.info_worker.result.connect(self.update_info)
@@ -706,13 +837,28 @@ class DashboardWindow(LegacyWindow):
             self.currency_grid.addWidget(chip, i % midpoint, i // midpoint)
             if name == '정령의 날개': self.wings.setText(f'정령의 날개  {amount:,}')
 
+    def _fit_to_active_screen(self):
+        """Size to 80% of, and center on, whichever screen the cursor is currently on -
+        so the window never starts larger than the monitor the user is actually at."""
+        screen = QApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
+        avail = screen.availableGeometry()
+        self.resize(int(avail.width() * 0.8), int(avail.height() * 0.8))
+        # Re-read the actual size: resize() above is clamped to setMinimumSize(), so on
+        # a very small screen the real size can end up bigger than the 80% requested.
+        w, h = self.width(), self.height()
+        self.move(avail.x() + (avail.width() - w) // 2, avail.y() + (avail.height() - h) // 2)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, 'info') and self.info.isVisible():
             self.info.setGeometry(12, 58, min(740, self.centralWidget().width()-24), self.centralWidget().height()-74)
 
     def closeEvent(self, event):
-        workers = [self.queue.worker, self._connection_worker, self.info_worker, self.catalog_worker]
+        # Stop new environment reads before checking the in-flight request.
+        self.environment_overlay.set_enabled(False)
+        workers = [self.queue.worker, self._connection_worker, self.info_worker,
+                   self.catalog_worker, self._scroll_worker, self.storage_panel._refresh_worker,
+                   self.environment_overlay.worker]
         if any(w is not None and w.isRunning() for w in workers):
             self.queue.paused = True
             if self.queue.worker:
@@ -723,4 +869,11 @@ class DashboardWindow(LegacyWindow):
         if self.music_panel._current_title:
             self.music_panel._stop_playback()
         self.overlay.set_enabled(False); self.overlay.close()
+        self.environment_overlay.close()
+        if self.character_watcher is not None:
+            self.character_watcher.stop()
+            watcher_workers = (self.character_watcher._poll_worker, self.character_watcher._identify_worker)
+            if any(w is not None and w.isRunning() for w in watcher_workers):
+                self.toast.show_message('캐릭터 정보 조회가 끝난 뒤 다시 닫아주세요.', 4000)
+                event.ignore(); return
         self.routine.close(); event.accept()

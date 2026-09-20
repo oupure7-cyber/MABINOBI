@@ -184,6 +184,22 @@ class ProductionSchedulingTests(unittest.TestCase):
         self.assertEqual(len(self.registrations(game)), 2)
         self.assertEqual(worker.remaining, 0)
 
+    def test_higher_tier_recipe_waits_for_shared_family_capacity(self):
+        # Names/facility map come from the N-tier family configuration; ingredient
+        # quantities below are synthetic. No matching recipe is queued yet, so
+        # the known family relationship must prevent an eighth registration.
+        game = DelayedGame({'특급 목재': 3, '시험 원료': 1}, {
+            '특급 목재': {'facility': '목재 가공 시설', 'produced': 3},
+            '계획 외 생산물': {'facility': '목재 가공 시설', 'produced': 1}},
+            gather=('시험 원료',))
+        game.add_existing('계획 외 생산물', 7)
+        worker, errors = self.run_game(game)
+        self.assertEqual(errors, [])
+        self.assertEqual(game.actions[0]['command'], 'execute_gathering')
+        self.assertEqual(len(self.registrations(game, '특급 목재')), 1)
+        self.assertTrue(all(a['occupancy_after'] <= 7 for a in self.registrations(game)))
+        self.assertEqual(worker.remaining, 0)
+
     def test_recursive_batch_demand_and_independent_gathering(self):
         game = DelayedGame({'최종 재료 A': 6, '채집재 B': 1}, {
             '최종 재료 A': {'facility': '상위 시설', 'produced': 2, 'ingredients': {'중간재 C': 3}},
