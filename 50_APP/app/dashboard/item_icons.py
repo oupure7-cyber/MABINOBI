@@ -24,6 +24,8 @@ def item_icon(name: str) -> QIcon:
     return QIcon()
 
 def spec_item_name(spec) -> str:
+    if getattr(spec, 'recipe_name', ''): return spec.recipe_name
+    if spec.key.startswith('craft:'): return spec.key[len('craft:'):]
     if spec.key.startswith('equipment_'): return spec.key[len('equipment_'):]
     if spec.key.startswith('cooking_'): return spec.key[len('cooking_'):].rsplit('_', 1)[0]
     if spec.key.startswith('gather_'): return spec.key[len('gather_'):]

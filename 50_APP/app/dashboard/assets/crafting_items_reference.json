@@ -1,0 +1,811 @@
+{
+  "source": "사용자 제공 2026-09-20 스크린샷 2~6의 보이는 아이템명만 수록",
+  "scope_notes": [
+    "반복 캡처에서 보이는 같은 아이템은 한 번만 기록했다.",
+    "visible_produced_per_craft는 아이콘 우측 하단 흰색 숫자만 옮겼다. 우측 상단 보유량은 제외했다.",
+    "숫자가 보이지 않는 아이템의 생산 수량은 추정하지 않고 null로 기록했다.",
+    "마법 유탄 구역 아래로 이어질 수 있는 잘린 레시피는 추가하지 않았다.",
+    "재료 구성, 생산시설 필요 조건, 소모 수량은 이 이미지로 확인할 수 없으므로 수록하지 않았다."
+  ],
+  "unique_item_names": 96,
+  "visible_recipe_cards_excluding_repeated_screenshots": 99,
+  "items": [
+    {
+      "name": "회복 물약",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 10,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "자동회복 물약",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "상급 회복 물약",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "상급 자동회복 물약",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "내열 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "방한 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "절연 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "축복의 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "봉인의 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "최상급 회복 물약",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "상급 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 10,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "최상급 자동회복 물약",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "상급 내열 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "상급 방한 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "상급 절연 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "상급 축복의 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "상급 봉인의 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "뛰어난 회복 물약",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "뛰어난 자동회복 물약",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "뛰어난 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "뛰어난 회복 물약S",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "최상급 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        2
+      ],
+      "visible_recipe_count": 2,
+      "visible_production_variants": [
+        10,
+        5
+      ],
+      "notes": "사진 2의 3번째 행에서 같은 이름이 두 칸으로 나타남. 좌측은 생산량 10, 우측은 생산량 5. 서로 다른 레시피 식별자는 사진으로 확인 불가."
+    },
+    {
+      "name": "뛰어난 자동회복 물약S",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "최상급 내열 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "최상급 방한 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "최상급 절연 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "최상급 축복의 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "최상급 봉인의 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "탁월한 회복 물약",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "상급 뛰어난 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "탁월한 자동회복 물약",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "상급 뛰어난 자동 붕대",
+      "group": "회복",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        2
+      ]
+    },
+    {
+      "name": "치명타 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "궁극기 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "피해 감소 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "이동 속도 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "상급 치명타 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "상급 궁극기 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "상급 피해 감소 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "상급 이동 속도 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "강타 강화 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "연타 강화 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "광역 강화 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "혼합 강화 비약(산사태)",
+      "group": "강화",
+      "visible_produced_per_craft": 2,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "혼합 강화 비약(폭풍우)",
+      "group": "강화",
+      "visible_produced_per_craft": 2,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "혼합 강화 비약(성난 파도)",
+      "group": "강화",
+      "visible_produced_per_craft": 2,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "상급 강타 강화 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "상급 연타 강화 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "상급 광역 강화 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "상급 혼합 강화 비약(산사태)",
+      "group": "강화",
+      "visible_produced_per_craft": 2,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "상급 혼합 강화 비약(폭풍우)",
+      "group": "강화",
+      "visible_produced_per_craft": 2,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "상급 혼합 강화 비약(성난 파도)",
+      "group": "강화",
+      "visible_produced_per_craft": 2,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "최상급 치명타 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "최상급 강타 강화 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "최상급 연타 강화 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "최상급 광역 강화 비약",
+      "group": "강화",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "최상급 혼합 강화 비약(붕괴)",
+      "group": "강화",
+      "visible_produced_per_craft": 2,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "최상급 혼합 강화 비약(격류)",
+      "group": "강화",
+      "visible_produced_per_craft": 2,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "최상급 혼합 강화 비약(절멸)",
+      "group": "강화",
+      "visible_produced_per_craft": 2,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "염색약",
+      "group": "염색약",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        3
+      ]
+    },
+    {
+      "name": "밀봉된 저주 해제 물약 상자",
+      "group": "기타약품",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        4
+      ],
+      "visible_recipe_count": 3,
+      "notes": "사진 4에서 같은 이름이 세 칸으로 나타남. 출력 수량/재료/식별자는 사진으로 확인 불가."
+    },
+    {
+      "name": "짜먹는 간식",
+      "group": "기타음식",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        4
+      ]
+    },
+    {
+      "name": "마법 유탄 부품",
+      "group": "마법유탄",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        4
+      ]
+    },
+    {
+      "name": "화염 마법 유탄",
+      "group": "마법유탄",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        4
+      ]
+    },
+    {
+      "name": "번개 마법 유탄",
+      "group": "마법유탄",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        4
+      ]
+    },
+    {
+      "name": "바람 마법 유탄",
+      "group": "마법유탄",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        4
+      ]
+    },
+    {
+      "name": "산성 마법 유탄",
+      "group": "마법유탄",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        4
+      ]
+    },
+    {
+      "name": "상급 마법 유탄 부품",
+      "group": "마법유탄",
+      "visible_produced_per_craft": 5,
+      "source_screenshots": [
+        4
+      ]
+    },
+    {
+      "name": "상급 화염 마법 유탄",
+      "group": "마법유탄",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        4
+      ]
+    },
+    {
+      "name": "상급 번개 마법 유탄",
+      "group": "마법유탄",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        4
+      ]
+    },
+    {
+      "name": "상급 바람 마법 유탄",
+      "group": "마법유탄",
+      "visible_produced_per_craft": 3,
+      "source_screenshots": [
+        4
+      ]
+    },
+    {
+      "name": "못",
+      "group": "일반재료",
+      "visible_produced_per_craft": 10,
+      "source_screenshots": [
+        5
+      ]
+    },
+    {
+      "name": "캠프파이어 키트",
+      "group": "캠프파이어",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "숙련 캠프파이어 키트",
+      "group": "캠프파이어",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "전문 캠프파이어 키트",
+      "group": "캠프파이어",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "원형 나무 소환 의자 상자(브라운)",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "원형 나무 소환 의자 상자(베이지)",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "클래식 나무 소환 의자 상자(브라운)",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "클래식 나무 소환 의자 상자(레드)",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "클래식 나무 소환 의자 상자(블루)",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "클래식 나무 소환 의자 상자(모노톤)",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "달콤한 흔들흔들 소환 의자 상자",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "편안한 흔들흔들 소환 의자 상자",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "상쾌한 흔들흔들 소환 의자 상자",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "느긋한 흔들흔들 소환 의자 상자",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "포근한 나들이 소환 의자 상자",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "평온한 나들이 소환 의자 상자",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "아늑한 나들이 소환 의자 상자",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "낚시 애호가 소환 의자 상자(그린)",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "낚시 애호가 소환 의자 상자(블루)",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "낚시 애호가 소환 의자 상자(베이지)",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "낚시 애호가 소환 의자 상자(핑크)",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "흰 닭 변신 인형",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        5,
+        6
+      ]
+    },
+    {
+      "name": "갈색 닭 변신 인형",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        6
+      ]
+    },
+    {
+      "name": "곰 변신 인형",
+      "group": "기타아이템",
+      "visible_produced_per_craft": null,
+      "source_screenshots": [
+        6
+      ]
+    }
+  ]
+}

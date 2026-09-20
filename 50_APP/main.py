@@ -18,7 +18,7 @@ exe로 배포된 경우 그 폴더가 없으면 해당 버튼만 "못 찾음"으
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QSettings
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
@@ -71,12 +71,13 @@ def main() -> int:
     apply_dark_theme(app)
 
     self_test = '--ui-self-test' in sys.argv
-    dashboard = DashboardWindow(PROJECT_ROOT, connect_on_start=not self_test)
+    output = Path(sys.argv[sys.argv.index('--ui-self-test') + 1]) if self_test else None
+    test_settings = QSettings(str(output.with_suffix('.ini')), QSettings.IniFormat) if self_test else None
+    dashboard = DashboardWindow(PROJECT_ROOT, connect_on_start=not self_test, settings=test_settings)
     dashboard.show()
 
     if self_test:
         # Exercise the frozen Qt runtime and real window, without contacting the game.
-        output = Path(sys.argv[sys.argv.index('--ui-self-test') + 1])
         def report_ready():
             import json
             output.write_text(json.dumps({
@@ -104,6 +105,16 @@ def main() -> int:
                 'rows': dashboard.catalog.rowCount(),
                 'names': [dashboard.catalog.item(i, 0).text() for i in range(dashboard.catalog.rowCount())],
             }, ensure_ascii=False), encoding='utf-8')
+            dashboard.select_category('무한가공소')
+            app.processEvents()
+            dashboard.grab().save(str(output.with_name(output.stem + '-workshop.png')))
+            dashboard.overlay.set_enabled(True)
+            dashboard.overlay.set_progress({'recipe':'무한가공소', 'stage':'가공', 'materials':[
+                {'name':name,'owned':done,'required':7,'state':f'시설 7/7 · 완료 {done}'}
+                for name,done in [('강철괴',2),('목재+',4),('옷감+',0),('가죽+',7)]], 'message':'화면 검증용 예시 · 실제 게임 데이터 아님'})
+            dashboard.overlay.set_preview(True)
+            app.processEvents()
+            dashboard.overlay.grab().save(str(output.with_name(output.stem + '-overlay.png')))
             dashboard.close()
             app.quit()
         QTimer.singleShot(800, report_ready)

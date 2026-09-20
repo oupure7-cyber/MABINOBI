@@ -79,6 +79,8 @@ class JobSpec:
     key: str
     name: str
     make_worker: Callable[[], object]  # -> a QThread-like: .status/.blocked/.stopped, .request_stop()
+    target_count: int = 0
+    recipe_name: str = ''
 
 
 def _make_altering_1h() -> AlteringRoutineWorker:
