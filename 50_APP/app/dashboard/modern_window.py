@@ -5,8 +5,10 @@ from pathlib import Path
 import json
 from copy import deepcopy
 from dataclasses import replace
+from datetime import datetime
+from time import monotonic
 from PySide6.QtCore import Qt, QSettings, QTimer, QThread, Signal, QSize
-from PySide6.QtGui import QCursor
+from PySide6.QtGui import QCursor, QColor
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QTabWidget, QButtonGroup, QTableWidget, QTableWidgetItem, QHeaderView,
     QSplitter, QFrame, QGridLayout, QScrollArea, QPlainTextEdit, QComboBox, QMessageBox,
@@ -22,6 +24,8 @@ from .music_panel import MusicPanel
 from ..cli_client import run_cli
 from .job_drag import JobCatalogTable, JobDropTable
 from .item_icons import item_icon, spec_item_name
+from .gather_catalog import GatherCatalogWorker, parse_gather_items, gather_state
+from .gather_job import GatherJobWorker
 from .crafting_catalog import (RecipeCatalogWorker, parse_recipes, recipe_state,
                               reference_recipes, merge_reference_recipes, catalogue_sort_key)
 from .crafting_detail import CraftingDetail
@@ -33,7 +37,8 @@ from .character_watcher import CharacterWatcher
 from .character_manager import CharacterManagerDialog
 from .storage_search import StorageSearchPanel
 from .. import character_profiles
-from .ui_kit import STYLE, heading, button, table
+from .ui_kit import STYLE, heading, button, table, OwnedCountDelegate, OWNED_COUNT_ROLE, OWNED_COUNT_COLOR
+from .owned_items import OwnedItemsIndex, OwnedItemCounts
 
 def kind(spec):
     if spec.key.startswith('craft:'): return '제작'
@@ -386,6 +391,11 @@ class DashboardWindow(LegacyWindow):
         self.setStyleSheet(STYLE)
         self._connection_worker = None; self._guide_dialog = None; self.info_worker = None
         self.catalog_worker = None
+        self.gather_rows = None
+        self.owned_items = OwnedItemsIndex.from_profile(None)
+        self._owned_checked_at = None
+        self._owned_clock = ''
+        self._owned_columns = ()
         self.recipe_rows = reference_recipes(); self.catalog_counts = {}; self.catalog_loaded = False
         self.category_buttons = {}
         self.settings = settings if settings is not None else QSettings('MabiNobi', 'Workspace')
@@ -455,7 +465,19 @@ class DashboardWindow(LegacyWindow):
         self.sync_button = button('제작 목록 동기화', self.sync_recipes)
         sync_row.addWidget(self.catalog_status, 1); sync_row.addWidget(self.sync_button)
         lv.addLayout(sync_row)
+        gather_sync_row = QHBoxLayout()
+        self.gather_status = QLabel('채집 참고 목록 128종 · 게임 연결 후 숙련도와 도구 조건을 확인하세요.')
+        self.gather_status.setWordWrap(True)
+        self.gather_sync_button = button('채집 목록 동기화', self.sync_gathering)
+        gather_sync_row.addWidget(self.gather_status, 1)
+        gather_sync_row.addWidget(self.gather_sync_button)
+        lv.addLayout(gather_sync_row)
+        self.owned_status = QLabel('보유 수량 확인 전 · 창고 = 캐릭터 창고 + 계정 창고')
+        self.owned_status.setStyleSheet('color: #b9c8cd; font-size: 12px;')
+        self.owned_status.setWordWrap(True)
+        lv.addWidget(self.owned_status)
         self.catalog = table(['재료 / 작업', '1회 기준'], JobCatalogTable)
+        self.catalog.setItemDelegate(OwnedCountDelegate(self.catalog))
         self.catalog.itemSelectionChanged.connect(self.show_recipe_detail)
         lv.addWidget(self.catalog, 1)
         self.empty = QLabel(''); self.empty.setWordWrap(True); lv.addWidget(self.empty)
@@ -492,25 +514,80 @@ class DashboardWindow(LegacyWindow):
         self.character_watcher = None
         self._active_profile_id = None
         self._character_manager_dialog = None
+        self._owned_timer = QTimer(self)
+        self._owned_timer.timeout.connect(self.refresh_owned_status)
+        self._owned_timer.start(2000)
         if connect_on_start:
             self._try_connect()
             self.overlay.set_enabled(self.overlay_toggle.isChecked())
             self.environment_overlay.set_enabled(self.overlay_toggle.isChecked())
             self.character_watcher = CharacterWatcher(self.project_root, parent=self)
             self.character_watcher.profile_updated.connect(self._on_profile_updated)
+            self.character_watcher.inventory_updated.connect(self.apply_owned_inventory)
 
     def _on_overlay_toggled(self, checked):
         self.toggle_overlay(checked)
 
     def _on_connection_result(self, ok, _detail):
         super()._on_connection_result(ok, _detail)
+        if not ok: self.apply_owned_inventory(None)
         self.overlay.set_enabled(bool(ok) and self.overlay_toggle.isChecked())
         self.environment_overlay.set_enabled(bool(ok) and self.overlay_toggle.isChecked())
 
     def _on_profile_updated(self, profile, all_profiles):
+        if self._active_profile_id != profile['profile_id']:
+            self.gather_rows = None
+            self.gather_status.setText('캐릭터가 변경되었습니다. 채집 목록을 다시 동기화해주세요.')
+            self.render_catalog()
         self._active_profile_id = profile['profile_id']
         self.active_character_label.setText(character_profiles.display_name(profile))
         self.storage_panel.render_results()
+
+    def apply_owned_inventory(self, profile):
+        """Update cells only: polling must not reset selection, scroll or editors."""
+        self.owned_items = OwnedItemsIndex.from_profile(profile)
+        self._owned_checked_at = monotonic() if profile is not None else None
+        self._owned_clock = datetime.now().strftime('%H:%M:%S') if profile is not None else ''
+        self.refresh_owned_cells()
+        self.refresh_owned_status()
+
+    def refresh_owned_status(self):
+        if self._owned_checked_at is None:
+            status = '보유 수량 확인 전'
+        elif monotonic() - self._owned_checked_at > 15:
+            status = f'최근 확인 {self._owned_clock} · 재조회 대기'
+        else:
+            status = f'보유 수량 {self._owned_clock} 갱신'
+        self.owned_status.setText(status + ' · 창고 = 캐릭터 창고 + 계정 창고')
+
+    def refresh_owned_cells(self):
+        if not self._owned_columns: return
+        specs = {s.key: s for s in self.specs}
+        equipment_names = {name for recipes in TOWN_EQUIPMENT.values() for name in recipes}
+        was_blocked = self.catalog.blockSignals(True)
+        for row in range(self.catalog.rowCount()):
+            name_item = self.catalog.item(row, 0)
+            spec = specs.get(name_item.data(Qt.UserRole)) if name_item else None
+            if spec is None: continue
+            name = spec_item_name(spec)
+            unsupported = name in equipment_names
+            counts = OwnedItemCounts() if unsupported else self.owned_items.for_name(name)
+            fmt = lambda n: '—' if n is None else f'{n:,}'
+            tooltip = ('게임 커넥터가 장비 보유 수량을 제공하지 않습니다.' if unsupported else
+                       f'{name}\n소지: {fmt(counts.inventory)}개\n캐릭터 창고: {fmt(counts.character_storage)}개\n'
+                       f'계정 창고: {fmt(counts.account_storage)}개\n합계: {fmt(counts.total)}개\n'
+                       '현재 캐릭터 기준 · 다른 캐릭터의 소지품은 제외\n—: 수량 확인 전 / 확인 불가')
+            for column, value in zip(self._owned_columns, (counts.inventory, counts.warehouse, counts.total)):
+                item = self.catalog.item(row, column)
+                if item is None:
+                    item = QTableWidgetItem()
+                    item.setData(OWNED_COUNT_ROLE, True)
+                    item.setForeground(QColor(OWNED_COUNT_COLOR))
+                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.catalog.setItem(row, column, item)
+                item.setText(fmt(value))
+                item.setToolTip(tooltip)
+        self.catalog.blockSignals(was_blocked)
 
     def refresh_active_character_label(self):
         """Re-render the toolbar label from disk - e.g. after a rename/delete in 캐릭터 관리."""
@@ -554,12 +631,16 @@ class DashboardWindow(LegacyWindow):
         if self.category == '제작':
             self.catalog_note.setText('목표 수량을 입력한 뒤 대기열로 드래그하세요. 필요한 가공을 채워두고, 생산 중에는 다른 부족 재료를 계속 준비합니다.')
         specs = [s for s in self.specs if kind(s) == self.category and needle in s.name.lower()]
+        if self.category == '채집': specs.sort(key=lambda s: spec_item_name(s))
         if self.category == '제작':
             specs.sort(key=lambda s: catalogue_sort_key((spec_item_name(s), self.recipe_rows.get(spec_item_name(s),{}))))
         if self.filter_mode == '최근 사용': specs = sorted([s for s in specs if s.key in self.recent], key=lambda s: self.recent.index(s.key))
         self.catalog.blockSignals(True)
-        self.catalog.setColumnCount(3 if self.category == '제작' else 2)
-        self.catalog.setHorizontalHeaderLabels(['아이템', '목표 수량', '재료 상태'] if self.category == '제작' else ['재료 / 작업', '1회 기준'])
+        headers = ['아이템', '목표 수량', '재료 상태'] if self.category == '제작' else ['재료 / 작업', '1회 기준', '채집 조건'] if self.category == '채집' else ['재료 / 작업', '1회 기준']
+        self._owned_columns = tuple(range(len(headers), len(headers) + 3)) if self.category != '무한가공소' else ()
+        if self._owned_columns: headers += ['소지', '창고', '합계']
+        self.catalog.setColumnCount(len(headers))
+        self.catalog.setHorizontalHeaderLabels(headers)
         self.catalog.setRowCount(0); self.catalog.setRowCount(len(specs))
         for i, spec in enumerate(specs):
             self.catalog.setRowHeight(i, 36)
@@ -587,6 +668,14 @@ class DashboardWindow(LegacyWindow):
                     item.setToolTip('\n'.join(part for part in [group, '오른쪽 대기열로 드래그하여 추가', detail] if part))
             else:
                 self.catalog.setItem(i, 1, QTableWidgetItem('  ' + quantity(spec) + '  '))
+                if self.category == '채집':
+                    self.catalog.setItem(i, 2, QTableWidgetItem(gather_state(spec_item_name(spec), self.gather_rows)))
+                    item.setToolTip('오른쪽 대기열로 드래그하여 추가\n목록에 없으면 미해금·숙련도 부족 또는 현재 미지원일 수 있습니다.\n실제 채집 조건은 게임에서 최종 확인합니다.')
+        self.refresh_owned_cells()
+        for col in self._owned_columns:
+            self.catalog.horizontalHeaderItem(col).setToolTip('현재 캐릭터의 소지품 / 캐릭터·계정 창고 / 전체 합계\n수량에 마우스를 올리면 창고별 수량을 확인합니다.')
+            self.catalog.horizontalHeaderItem(col).setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.owned_status.setVisible(bool(self._owned_columns))
         self.catalog.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         for col in range(1, self.catalog.columnCount()): self.catalog.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeToContents)
         self.catalog.blockSignals(False)
@@ -596,6 +685,7 @@ class DashboardWindow(LegacyWindow):
         self.routine.setVisible(self.category == '무한가공소')
         self.craft_detail.setVisible(self.category == '제작' and isinstance(self.queue.worker, CraftingWorker))
         self.catalog_status.setVisible(self.category == '제작'); self.sync_button.setVisible(self.category == '제작')
+        self.gather_status.setVisible(self.category == '채집'); self.gather_sync_button.setVisible(self.category == '채집')
         self.catalog.setMaximumHeight(125 if self.category == '무한가공소' else 16777215)
 
     def add_job_key(self, key):
@@ -621,6 +711,31 @@ class DashboardWindow(LegacyWindow):
     def set_recipe_quantity(self, key, amount):
         self.catalog_counts[key] = amount
         self.show_recipe_detail()
+
+    def sync_gathering(self):
+        if self.query_busy(): return
+        if self.queue.worker or self.music_panel._current_title:
+            self.toast.show_message('현재 작업이 끝난 뒤 채집 목록을 동기화해주세요.'); return
+        self.gather_status.setText('게임의 채집 목록을 읽는 중…')
+        self.gather_sync_button.setEnabled(False)
+        self.catalog_worker = GatherCatalogWorker(self)
+        self.catalog_worker.result.connect(self.apply_gathering)
+        self.catalog_worker.finished.connect(lambda: self.gather_sync_button.setEnabled(True))
+        self.catalog_worker.start()
+
+    def apply_gathering(self, data):
+        try: rows = parse_gather_items(data)
+        except ValueError as exc:
+            self.gather_status.setText(str(exc)); return
+        self.gather_rows = rows
+        existing = {s.key for s in self.specs}
+        for name in sorted(rows):
+            key = 'gather_' + name
+            if key not in existing:
+                self.specs.append(JobSpec(key, f'채집: {name} x100', lambda n=name: GatherJobWorker(n)))
+        total = sum(s.key.startswith('gather_') for s in self.specs)
+        self.gather_status.setText(f'채집 {total}종 · 현재 캐릭터 목록 {len(rows)}종 · 미해금 항목도 참고 목록에 유지됩니다.')
+        self.render_catalog()
 
     def sync_recipes(self):
         if self.query_busy(): return

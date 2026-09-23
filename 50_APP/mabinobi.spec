@@ -16,7 +16,7 @@ a = Analysis(
     optimize=0,
 )
 # Use Windows API-set libraries from the operating system, never bundled image-tool copies.
-a.binaries = [entry for entry in a.binaries if 'codex-runtimes' not in entry[1].lower() and not Path(entry[0]).name.lower().startswith(('api-ms-win-', 'ext-ms-win-'))]
+a.binaries = [entry for entry in a.binaries if '/dependencies/native/' not in entry[1].replace('\\', '/').lower() and Path(entry[0]).name.lower() != 'ucrtbase.dll' and not Path(entry[0]).name.lower().startswith(('api-ms-win-', 'ext-ms-win-'))]
 pyz = PYZ(a.pure)
 
 exe = EXE(

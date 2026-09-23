@@ -4,8 +4,7 @@
 Each JOB just calls execute_gathering once for a fixed display name (up to 100 per call,
 matching the game's own per-call cap) and finishes - there's no internal repeat loop, since
 running it more than once is exactly what the JOB queue's own `◀ N ▶` stepper is for, same as
-every other JOB type in this app. GATHER_ITEMS is the same user-picked list (2026-09-18,
-duplicates collapsed, 가나다순) the button grid used to render.
+every other JOB type in this app. GATHER_ITEMS loads the bundled gathering reference catalogue (가나다순).
 """
 
 from __future__ import annotations
@@ -16,40 +15,11 @@ from PySide6.QtCore import QThread, Signal
 
 from ..cli_client import run_cli
 from .widgets import classify_cli_result
+from .gather_catalog import reference_gather_items
 
 GATHER_TIMEOUT = 900  # execute_gathering can take several minutes for a full 100-item run
 
-GATHER_ITEMS = sorted(
-    dict.fromkeys(
-        [
-            "황금 개암 버섯",
-            "황금 달걀",
-            "황금 거미줄",
-            "황금 네잎클로버",
-            "황금 우유",
-            "황금 사과",
-            "황금 나뭇가지",
-            "황금 헤이즐넛",
-            "황금 거미줄+",
-            "단단한 통나무",
-            "황금 풍뎅이",
-            "부드러운 통나무",
-            "벼락 맞은 나뭇가지",
-            "황금 부스러기",
-            "마력 깃든 돌",
-            "반짝이는 이끼",
-            "황금 이끼",
-            "황금 양털",
-            "두꺼운 양털",
-            "황금 양털+",
-            "황금 줄기",
-            "묵직한 감자",
-            "황금 나비",
-            "황금 잠자리",
-            "황금 사슴벌레",
-        ]
-    )
-)
+GATHER_ITEMS = reference_gather_items()
 
 
 class GatherJobWorker(QThread):

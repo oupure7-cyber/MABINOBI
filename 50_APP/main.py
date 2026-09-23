@@ -26,6 +26,7 @@ from PySide6.QtWidgets import QApplication
 
 from app.dashboard.modern_window import DashboardWindow
 from app.dashboard.cli_setup import ensure_cli_path
+from app.version import APP_VERSION
 
 if getattr(sys, "frozen", False):
     PROJECT_ROOT = Path(sys.executable).resolve().parent
@@ -86,6 +87,7 @@ def main() -> int:
         def report_ready():
             import json
             output.write_text(json.dumps({
+                'version': APP_VERSION,
                 'visible': dashboard.isVisible(),
                 'title': dashboard.windowTitle(),
                 'tabs': [dashboard.tabs.tabText(i) for i in range(dashboard.tabs.count())],

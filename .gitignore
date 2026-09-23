@@ -29,3 +29,9 @@ dist/
 
 # Per-machine MabinogiMobile_CLI.exe location (varies per user's install, not shared)
 /cli_settings.json
+
+# Local release downloads and rollback archives
+/MabiNobi.exe
+/*.exe.bak
+/*.7z
+/보유수량-업데이트.txt

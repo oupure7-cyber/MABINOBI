@@ -2,7 +2,22 @@
 that must visually match it, e.g. character_manager.py). Kept separate from
 modern_window.py so those dialogs can import this without a circular import."""
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtWidgets import QLabel, QPushButton, QTableWidget, QHeaderView
+from PySide6.QtGui import QColor, QPalette
+from PySide6.QtWidgets import QLabel, QPushButton, QTableWidget, QHeaderView, QStyledItemDelegate
+
+OWNED_COUNT_ROLE = Qt.UserRole + 11
+OWNED_COUNT_COLOR = '#ffdf70'
+
+
+class OwnedCountDelegate(QStyledItemDelegate):
+    """Keep quantities yellow even when their entire row is selected."""
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        if index.data(OWNED_COUNT_ROLE):
+            color = QColor(OWNED_COUNT_COLOR)
+            option.palette.setColor(QPalette.Text, color)
+            option.palette.setColor(QPalette.HighlightedText, color)
+
 
 STYLE = """
 QWidget { background: #121e23; color: #e4e9eb; font-family: 'Malgun Gothic'; font-size: 14px; }

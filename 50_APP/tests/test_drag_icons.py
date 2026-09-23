@@ -36,7 +36,7 @@ class DragIconTests(unittest.TestCase):
         self.assertEqual(len(added), 1)
     def test_exact_icons_decode_and_unknown_has_no_substitute(self):
         manifest = json.loads((ICON_DIR/'manifest.json').read_text(encoding='utf-8'))
-        self.assertEqual(len(manifest), 42)
+        self.assertGreaterEqual(len(manifest), 128)
         for name in manifest:
             self.assertFalse(item_icon(name).pixmap(26, 26).isNull(), name)
         for spec in JOB_CATALOG:
