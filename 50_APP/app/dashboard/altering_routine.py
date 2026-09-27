@@ -29,13 +29,16 @@ wood/leather/cloth (금속만 맨 앞에 원재료 루트가 2개인 "철괴" �
 훨씬 초과하면 나머지는 전부 상위 재료로 승격" 동작이다. 위에서 아래로 훑는 순서 자체가 "가능한
 한 가장 높은 단계부터" 우선순위를 보장하고, 막히면 자연히 한 단계씩 아래로 폴백한다.
 
-**이번 버전이 자동 채집하는 원재료는 예전과 동일한 범위로 한정된다**: 0단계 원재료
-(광석/철 광석/통나무/양털)와 1단계가 쓰는 계열 공통 보조재료(석탄/나무 진액/양털 - 타닌
-가루는 예전부터 채집 불가로 확인됨) 뿐이다. 3단계 이상에서 새로 등장하는 전용 원재료(동
-광석/백동 광석/은 광석/운철 광석/백금강석, 상급~특급 통나무/생가죽/양털+)와 그 단계들이 추가로
-소비하는 보조재료는 이번 버전에서 자동 채집 대상에 넣지 않는다(사용자 지정, 1차 버전) - 보유분만
-소비하고, 부족하면 그 단계는 조용히 건너뛰고 한 단계 아래로 폴백한다. 나중에
-`get_gatherable_items`로 실측하면 확장할 수 있다.
+**자동 채집 범위** (사용자 지정, 2026-09-28; `get_gatherable_items` 실측으로 확인): 금속/목재/
+옷감은 모든 단계의 원재료와 보조재료(광석류/석탄, 통나무류/나무 진액, 양털류)를 채집한다. 가죽은
+생가죽류와 타닌 가루가 전부 채집 불가라 아무것도 채집하지 않고 보유분만 소비한다. 채집 수요는
+현재 목표 등급 이하 단계만 합산하므로, 목표가 낮으면 상위 원재료는 캐러 가지 않는다. 부족한
+재료가 있는 단계는 건너뛰고 한 단계 아래로 폴백한다.
+
+**대체 레시피는 쓰지 않는다**: 게임에는 은합금괴(마력 깃든 돌), 최상급 목재(단단한 통나무),
+최상급 옷감(두꺼운 양털), 최상급 가죽(반짝이는 이끼)을 만드는 같은 이름의 두 번째 레시피가 있다.
+`FAMILIES`에는 기본 레시피만 두어 그 재료가 충분할 때만 등록한다. `execute_altering`은
+이름만 받아 어느 레시피가 쓰일지는 게임이 정한다(사용자 결정: 추가 확인 없이 게임에 맡김).
 
 Scheduling algorithm (round 1: sweep+fill, round 2: gather) is otherwise unchanged from the
 2026-09-18 design:
@@ -43,7 +46,8 @@ Scheduling algorithm (round 1: sweep+fill, round 2: gather) is otherwise unchang
   1. 시설을 한 바퀴 돌 때는 시설 A를 회수하고 바로 A를 끝까지 채운 다음 시설 B로 넘어간다.
   2. 채집은 한 번에 최대 100개까지. 완료된 시설이 4곳 중 3곳 이상이면 회수+재충전 라운드를
      먼저 하고 나서 다음 채집으로 넘어간다.
-  3. 원자재 자체를 "언제 채집할지"는 7작업분(`RAW_MATERIAL_BUFFER_MULTIPLIER`배, 기본 5배)에
+  3. 원자재 자체를 "언제 채집할지"는 목표 등급 이하 단계마다 7작업분 x 단계별 배수
+     (`tier_buffer_multiplier`: 1~3단계 5배, 4단계 2배, 5단계부터 1배)를 합친 양에
      못 미치면 그 재료가 채집 후보에 오르는 방식 - 여러 재료 중 목표치 대비 가장 많이 모자란
      것부터, 목표치에 도달할 때까지 계속.
 
@@ -81,6 +85,16 @@ READY_FACILITY_THRESHOLD = 3  # out of 4 - see scheduling rule 2 in the module d
 # trip for it is no longer "worth it" (2026-09-18, user request, raised from 2x to 5x after
 # noticing the character sat idle a lot between gather trips).
 RAW_MATERIAL_BUFFER_MULTIPLIER = 5
+# 상위 단계는 작업 1회가 몇 시간씩 걸려 재료 소모가 느리므로 적재량을 줄인다(사용자 지정,
+# 2026-09-28): tier index 3(4단계: 특수강괴/상급 목재+/...)은 2배, index 4(5단계)부터는 1배.
+REDUCED_BUFFER_MULTIPLIERS: dict[int, int] = {3: 2}
+MIN_BUFFER_TIER_IDX = 4
+
+
+def tier_buffer_multiplier(tier_idx: int) -> int:
+    if tier_idx >= MIN_BUFFER_TIER_IDX:
+        return 1
+    return REDUCED_BUFFER_MULTIPLIERS.get(tier_idx, RAW_MATERIAL_BUFFER_MULTIPLIER)
 # 철 광석/광석 채집 지점은 유독 왕복이 오래 걸린다는 사용자 피드백(2026-09-18) - 이 둘을 캐러
 # 갈 때는 목표치 도달 여부와 무관하게 그 자리에서 두 번 연달아 채집(최대 200개)해서 이동
 # 시간을 낭비하지 않는다. 다른 재료는 이동이 짧아 그대로 1회.
@@ -118,15 +132,18 @@ class Family:
     default_target_idx: int = 1  # matches the old hardcoded behavior (강철괴류) until moved
     skip_below: tuple[str, int] | None = None  # (material, min_total) - skip whole family if under
 
-    def raw_material_demand(self) -> dict[str, int]:
-        """Gatherable raw materials this family needs, summed per one round of 7 works -
-        unchanged in scope from before this redesign (see module docstring)."""
+    def raw_material_demand(self, target_idx: int) -> dict[str, int]:
+        """Stock level to gather each raw material up to: every tier 0..target_idx adds one
+        7-work round of its gatherable inputs x that tier's buffer multiplier
+        (`tier_buffer_multiplier`). Tiers above the target add nothing, so a low target never
+        sends the worker off to gather materials only higher tiers consume."""
         demand: dict[str, int] = {}
-        for tier in self.tiers:
+        for tier_idx, tier in enumerate(self.tiers[: target_idx + 1]):
+            multiplier = tier_buffer_multiplier(tier_idx)
             for option in tier.recipes:
                 for ing in option.inputs:
                     if not ing.is_previous_tier and ing.gatherable:
-                        demand[ing.material] = demand.get(ing.material, 0) + ing.qty
+                        demand[ing.material] = demand.get(ing.material, 0) + ing.qty * QUEUE_CAPACITY * multiplier
         return demand
 
 
@@ -146,28 +163,29 @@ FAMILIES: tuple[Family, ...] = (
             )),)),
             Tier("합금강괴", (RecipeOption("합금강괴", (
                 Ingredient("강철괴", 3, True),
-                Ingredient("동 광석", 15, False),
-                Ingredient("석탄", 8, False),
+                Ingredient("동 광석", 15, False, gatherable=True),
+                Ingredient("석탄", 8, False, gatherable=True),
             )),)),
             Tier("특수강괴", (RecipeOption("특수강괴", (
                 Ingredient("합금강괴", 4, True),
-                Ingredient("백동 광석", 20, False),
-                Ingredient("석탄", 12, False),
+                Ingredient("백동 광석", 20, False, gatherable=True),
+                Ingredient("석탄", 12, False, gatherable=True),
             )),)),
             Tier("은합금괴", (RecipeOption("은합금괴", (
                 Ingredient("특수강괴", 5, True),
-                Ingredient("은 광석", 20, False),
-                Ingredient("석탄", 16, False),
+                Ingredient("은 광석", 20, False, gatherable=True),
+                Ingredient("석탄", 16, False, gatherable=True),
             )),)),
             Tier("운철괴", (RecipeOption("운철괴", (
                 Ingredient("은합금괴", 5, True),
-                Ingredient("운철 광석", 20, False),
-                Ingredient("석탄", 20, False),
+                Ingredient("운철 광석", 20, False, gatherable=True),
+                Ingredient("석탄", 20, False, gatherable=True),
             )),)),
+            # 게임 커넥터 실측(2026-09-28): 재료명은 "백금 광석" - 조사 문서의 "백금강석"은 오기.
             Tier("백금강괴", (RecipeOption("백금강괴", (
                 Ingredient("운철괴", 5, True),
-                Ingredient("백금강석", 20, False),
-                Ingredient("석탄", 20, False),
+                Ingredient("백금 광석", 20, False, gatherable=True),
+                Ingredient("석탄", 20, False, gatherable=True),
             )),)),
         ),
     ),
@@ -183,28 +201,28 @@ FAMILIES: tuple[Family, ...] = (
             )),)),
             Tier("상급 목재", (RecipeOption("상급 목재", (
                 Ingredient("목재+", 3, True),
-                Ingredient("상급 통나무", 15, False),
-                Ingredient("나무 진액", 8, False),
+                Ingredient("상급 통나무", 15, False, gatherable=True),
+                Ingredient("나무 진액", 8, False, gatherable=True),
             )),)),
             Tier("상급 목재+", (RecipeOption("상급 목재+", (
                 Ingredient("상급 목재", 4, True),
-                Ingredient("상급 통나무+", 20, False),
-                Ingredient("나무 진액", 12, False),
+                Ingredient("상급 통나무+", 20, False, gatherable=True),
+                Ingredient("나무 진액", 12, False, gatherable=True),
             )),)),
             Tier("최상급 목재", (RecipeOption("최상급 목재", (
                 Ingredient("상급 목재+", 5, True),
-                Ingredient("최상급 통나무", 20, False),
-                Ingredient("나무 진액", 16, False),
+                Ingredient("최상급 통나무", 20, False, gatherable=True),
+                Ingredient("나무 진액", 16, False, gatherable=True),
             )),)),
             Tier("최상급 목재+", (RecipeOption("최상급 목재+", (
                 Ingredient("최상급 목재", 5, True),
-                Ingredient("최상급 통나무+", 20, False),
-                Ingredient("나무 진액", 20, False),
+                Ingredient("최상급 통나무+", 20, False, gatherable=True),
+                Ingredient("나무 진액", 20, False, gatherable=True),
             )),)),
             Tier("특급 목재", (RecipeOption("특급 목재", (
                 Ingredient("최상급 목재+", 5, True),
-                Ingredient("특급 통나무", 20, False),
-                Ingredient("나무 진액", 20, False),
+                Ingredient("특급 통나무", 20, False, gatherable=True),
+                Ingredient("나무 진액", 20, False, gatherable=True),
             )),)),
         ),
     ),
@@ -258,28 +276,28 @@ FAMILIES: tuple[Family, ...] = (
             )),)),
             Tier("상급 옷감", (RecipeOption("상급 옷감", (
                 Ingredient("옷감+", 3, True),
-                Ingredient("상급 양털", 15, False),
-                Ingredient("양털", 8, False),
+                Ingredient("상급 양털", 15, False, gatherable=True),
+                Ingredient("양털", 8, False, gatherable=True),
             )),)),
             Tier("상급 옷감+", (RecipeOption("상급 옷감+", (
                 Ingredient("상급 옷감", 4, True),
-                Ingredient("상급 양털+", 20, False),
-                Ingredient("양털", 12, False),
+                Ingredient("상급 양털+", 20, False, gatherable=True),
+                Ingredient("양털", 12, False, gatherable=True),
             )),)),
             Tier("최상급 옷감", (RecipeOption("최상급 옷감", (
                 Ingredient("상급 옷감+", 5, True),
-                Ingredient("최상급 양털", 20, False),
-                Ingredient("양털", 16, False),
+                Ingredient("최상급 양털", 20, False, gatherable=True),
+                Ingredient("양털", 16, False, gatherable=True),
             )),)),
             Tier("최상급 옷감+", (RecipeOption("최상급 옷감+", (
                 Ingredient("최상급 옷감", 5, True),
-                Ingredient("최상급 양털+", 20, False),
-                Ingredient("양털", 20, False),
+                Ingredient("최상급 양털+", 20, False, gatherable=True),
+                Ingredient("양털", 20, False, gatherable=True),
             )),)),
             Tier("특급 옷감", (RecipeOption("특급 옷감", (
                 Ingredient("최상급 옷감+", 5, True),
-                Ingredient("특급 양털", 20, False),
-                Ingredient("양털", 20, False),
+                Ingredient("특급 양털", 20, False, gatherable=True),
+                Ingredient("양털", 20, False, gatherable=True),
             )),)),
         ),
     ),
@@ -559,8 +577,7 @@ class AlteringRoutineWorker(QThread):
         for family in FAMILIES:
             if is_skipped(family):
                 continue
-            for material, qty in family.raw_material_demand().items():
-                target = QUEUE_CAPACITY * qty * RAW_MATERIAL_BUFFER_MULTIPLIER
+            for material, target in family.raw_material_demand(self._target_for(family.key)).items():
                 current = inv.get(material, 0)
                 if current < target:
                     candidates.append((current / target, family, material))

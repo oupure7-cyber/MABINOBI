@@ -10,7 +10,7 @@ import sys
 import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.dashboard.altering_routine import FAMILIES, QUEUE_CAPACITY, PROMOTION_MARGIN, AlteringRoutineWorker
+from app.dashboard.altering_routine import FAMILIES, QUEUE_CAPACITY, PROMOTION_MARGIN, AlteringRoutineWorker, tier_buffer_multiplier
 
 
 def family(key):
@@ -59,6 +59,14 @@ class FamilyDataTests(unittest.TestCase):
                 others = [i for i in option.inputs if not i.is_previous_tier]
                 self.assertEqual(prev.qty, expected_n[offset], f'{f.key} tier {idx} N')
                 self.assertEqual({i.qty for i in others}, {expected_m[offset], expected_k[offset]}, f'{f.key} tier {idx} M/K')
+
+    def test_same_name_alternative_recipes_are_not_modelled(self):
+        # 사용자 지정: 마력 깃든 돌/단단한 통나무/두꺼운 양털/반짝이는 이끼 레시피는 쓰지 않는다.
+        banned = {'마력 깃든 돌', '단단한 통나무', '두꺼운 양털', '반짝이는 이끼'}
+        for f in FAMILIES:
+            for tier in f.tiers:
+                for option in tier.recipes:
+                    self.assertFalse(banned & {ing.material for ing in option.inputs}, f'{f.key} {tier.name}')
 
     def test_leather_tannin_and_rawhide_are_not_gatherable(self):
         leather = family('leather')
@@ -137,6 +145,51 @@ class PlanOneSlotTests(unittest.TestCase):
                 total_consumed[material] = total_consumed.get(material, 0) + qty
         self.assertEqual(total_consumed, {'철괴': 9, '석탄': 12})
         self.assertEqual(inv, inv_before)  # _plan_fill only mutates its own scratch copy
+
+
+class GatherDemandTests(unittest.TestCase):
+    def test_default_target_demand_is_unchanged(self):
+        # 7 works x 5 - same stock targets as before the per-tier multiplier existed.
+        self.assertEqual(family('metal').raw_material_demand(1), {'철 광석': 350, '광석': 700, '석탄': 140})
+
+    def test_every_metal_wood_cloth_raw_is_gatherable(self):
+        for key in ('metal', 'wood', 'cloth'):
+            for tier in family(key).tiers:
+                for option in tier.recipes:
+                    for ing in option.inputs:
+                        if not ing.is_previous_tier:
+                            self.assertTrue(ing.gatherable, f'{key} {ing.material}')
+
+    def test_leather_never_gathers_anything(self):
+        self.assertEqual(family('leather').raw_material_demand(6), {})
+
+    def test_buffer_multiplier_drops_to_2x_at_stage_4_and_1x_from_stage_5(self):
+        self.assertEqual([tier_buffer_multiplier(i) for i in range(7)], [5, 5, 5, 2, 1, 1, 1])
+
+    def test_platinum_tier_uses_the_in_game_ore_name(self):
+        option = family('metal').tiers[6].recipes[0]
+        self.assertIn('백금 광석', {ing.material for ing in option.inputs})
+
+    def test_demand_only_covers_tiers_up_to_the_target(self):
+        demand = family('metal').raw_material_demand(3)
+        self.assertEqual(demand['동 광석'], 15 * 7 * 5)
+        self.assertEqual(demand['백동 광석'], 20 * 7 * 2)
+        self.assertEqual(demand['석탄'], (4 + 8) * 7 * 5 + 12 * 7 * 2)
+        self.assertNotIn('은 광석', demand)
+
+    def test_coal_stock_target_at_platinum(self):
+        # 강철괴/합금강괴 5x, 특수강괴 2x, 은합금괴/운철괴/백금강괴 1x
+        expected = (4 + 8) * 35 + 12 * 14 + (16 + 20 + 20) * 7
+        self.assertEqual(family('metal').raw_material_demand(6)['석탄'], expected)
+
+    def test_decide_gather_skips_higher_tier_ores_at_low_target(self):
+        worker = AlteringRoutineWorker()
+        full = {name: 10**6 for name in ('철 광석', '광석', '석탄', '통나무', '나무 진액', '양털')}
+        self.assertIsNone(worker._decide_gather(full))
+        worker.set_target('metal', 6)
+        family_, material = worker._decide_gather(full)
+        self.assertEqual(family_.key, 'metal')
+        self.assertIn(material, ('동 광석', '백동 광석', '은 광석', '운철 광석', '백금 광석'))
 
 
 class TargetStorageTests(unittest.TestCase):
